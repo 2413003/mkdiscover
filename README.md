@@ -4,6 +4,333 @@ A static GitHub Pages web app plus Supabase backend for becoming the default dis
 
 The goal is not a narrow event directory. The goal is to index and surface **everything people might want to discover in Milton Keynes**: events, classes, clubs, food, services, local offers, venues, jobs, volunteering, activities, communities, organisations, spaces, and more.
 
+# MK Discover — Full System README
+
+## CORE OBJECTIVE
+
+Become the **default starting point for ALL activity in Milton Keynes**.
+
+> When anyone in MK wants anything, they check this first.
+
+This is NOT just a website.
+This is a **discovery layer for an entire city**.
+
+---
+
+# FUNDAMENTAL STRATEGY
+
+This project is designed to replicate what companies like:
+
+* Google (discovery)
+* Amazon (transactions)
+* Apple (default interface)
+* Microsoft (daily workflow)
+
+do — but at a **local monopoly level (Milton Keynes)**.
+
+### The goal:
+
+Control:
+
+* where people go
+* what people do
+* what people buy
+* how people spend time
+
+---
+
+# PRODUCT PRINCIPLE
+
+The product must answer ONE question perfectly:
+
+> "What should I do right now in Milton Keynes?"
+
+Everything else expands from this.
+
+---
+
+# NON-NEGOTIABLE RULES
+
+## 1. NO FAKE DATA (CRITICAL)
+
+Production must NEVER include:
+
+* fake listings
+* placeholder content
+* demo entries
+
+If no data exists:
+
+* show empty state
+* do NOT fabricate
+
+Reason:
+Trust = monopoly.
+Fake data destroys trust.
+
+---
+
+## 2. SPEED > EVERYTHING
+
+User should get value in < 2 seconds.
+
+* no login required
+* no friction
+* instant results
+
+---
+
+## 3. CLARITY > FEATURES
+
+* minimal UI
+* no clutter
+* only high-value info
+
+---
+
+## 4. LOCAL DOMINANCE ONLY
+
+Do NOT expand outside Milton Keynes until dominance achieved.
+
+---
+
+# SYSTEM ARCHITECTURE
+
+## Frontend (GitHub Pages)
+
+* index.html
+* styles.css
+* app.js
+* config.js
+
+Role:
+
+* display data
+* handle search
+* render results
+
+## Backend (Supabase)
+
+* search_documents table
+* categories table
+
+Role:
+
+* store ALL real data
+* control publishing
+* enable querying
+
+## Deployment
+
+* GitHub Actions → GitHub Pages
+
+---
+
+# DATA MODEL
+
+Everything is stored as a **search document**.
+
+This allows:
+
+* unified search
+* flexible expansion
+* simple indexing
+
+## Types (expand over time)
+
+* event
+* place
+* food
+* service
+* job
+* deal
+* activity
+
+---
+
+# PHASED ROADMAP
+
+## PHASE 1 — EVENTS DOMINATION (START HERE)
+
+Goal:
+Own "what’s happening in MK"
+
+Actions:
+
+* manually input events
+* scrape from:
+
+  * Facebook
+  * Eventbrite
+  * Meetup
+  * local venues
+* add your own events (chess etc.)
+
+Target:
+
+* 50–200 real listings
+
+---
+
+## PHASE 2 — DAILY HABIT
+
+Goal:
+Make users check daily
+
+Add:
+
+* "Today"
+* "Tonight"
+* "This week"
+
+Distribution:
+
+* Facebook groups
+* QR codes (chess club)
+* posters
+
+---
+
+## PHASE 3 — CATEGORY EXPANSION
+
+Add:
+
+* food
+* services
+* gyms
+* study spots
+* jobs
+
+Goal:
+Expand from events → everything
+
+---
+
+## PHASE 4 — SUPPLY LOCK-IN
+
+Make businesses NEED the platform
+
+Add:
+
+* submit listing form
+* featured placements
+* analytics (future)
+
+---
+
+## PHASE 5 — MONETISATION
+
+* featured listings
+* commissions
+* promote your own businesses
+
+---
+
+# DISTRIBUTION STRATEGY (CRITICAL)
+
+## 1. Facebook groups
+
+Post:
+"Everything happening in Milton Keynes today"
+
+## 2. Physical presence
+
+* posters
+* QR codes
+* events (your chess club)
+
+## 3. SEO (later)
+
+Pages:
+
+* things to do in MK today
+* MK events this week
+
+---
+
+# WHY THIS WORKS
+
+Most platforms fail because:
+
+* fragmented information
+* outdated listings
+* poor UX
+
+This wins by:
+
+* being faster
+* being simpler
+* being more relevant
+
+---
+
+# FUTURE SYSTEMS (AI SHOULD BUILD THESE)
+
+## 1. Ingestion pipeline
+
+Automatically collect:
+
+* events
+* businesses
+* listings
+
+## 2. Ranking engine
+
+Sort by:
+
+* relevance
+* time
+* popularity
+
+## 3. Entity pages
+
+Each listing gets its own page
+
+## 4. User signals
+
+Clicks → improve ranking
+
+## 5. Notifications
+
+Daily updates
+
+---
+
+# SUCCESS METRIC
+
+Primary metric:
+
+> % of Milton Keynes residents who check this first
+
+---
+
+# FAILURE MODES (AVOID THESE)
+
+* fake data
+* too much text
+* confusing
+* amateur design
+* complicated user interface
+* difficult to use
+* slow UI
+* cluttered design
+* too many features early
+* expanding outside MK too early
+
+
+---
+
+# FINAL TRUTH
+
+This project is NOT about building a website.
+
+It is about:
+
+> Controlling the starting point of human action in Milton Keynes.
+
+That is how monopoly is achieved.
+
+
 ## Non-negotiable product rule
 
 **Long term, production must contain no fake or demo listings.**
