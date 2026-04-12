@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MK Discover</title>
+  <meta name="description" content="Discover what's happening, available, and worth knowing in Milton Keynes." />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="page-shell">
+    <header class="hero">
+      <div class="hero__inner">
+        <div class="badge">Milton Keynes discovery layer</div>
+        <h1>Be the first place people check in MK.</h1>
+        <p class="hero__text">
+          Search real places, events, services, offers, organisations, venues, activities and opportunities in Milton Keynes.
+        </p>
+
+        <section class="search-panel" aria-label="Search Milton Keynes listings">
+          <form id="search-form" class="search-form">
+            <div class="search-input-wrap">
+              <input
+                id="search-input"
+                name="q"
+                type="search"
+                autocomplete="off"
+                placeholder="Search Milton Keynes: chess, brunch, jobs, co-working, boxing, volunteering..."
+                aria-label="Search listings in Milton Keynes"
+              />
+            </div>
+            <button type="submit">Search</button>
+          </form>
+
+          <div class="controls">
+            <label>
+              Category
+              <select id="category-filter">
+                <option value="">All</option>
+              </select>
+            </label>
+
+            <label>
+              Sort
+              <select id="sort-filter">
+                <option value="relevance">Relevance</option>
+                <option value="newest">Newest</option>
+                <option value="name">Name</option>
+              </select>
+            </label>
+
+            <label class="toggle-wrap">
+              <input id="open-now-filter" type="checkbox" />
+              <span>Open / active now</span>
+            </label>
+          </div>
+        </section>
+      </div>
+    </header>
+
+    <main class="content">
+      <section class="stats-bar" id="stats-bar" aria-live="polite"></section>
+
+      <section class="status-card" id="status-card">
+        <h2>Connect real data</h2>
+        <p>
+          This app is built for real Milton Keynes data. Add your Supabase URL and anon key in <code>config.js</code>, then insert real records into the database.
+        </p>
+      </section>
+
+      <section class="results-section">
+        <div class="results-header">
+          <h2>Results</h2>
+          <p id="results-summary">No search yet.</p>
+        </div>
+        <div id="results-grid" class="results-grid"></div>
+      </section>
+    </main>
+  </div>
+
+  <template id="result-card-template">
+    <article class="card">
+      <div class="card__top">
+        <div>
+          <div class="card__eyebrow"></div>
+          <h3 class="card__title"></h3>
+        </div>
+        <div class="card__score"></div>
+      </div>
+      <p class="card__description"></p>
+      <div class="card__meta"></div>
+      <div class="card__tags"></div>
+      <div class="card__actions"></div>
+    </article>
+  </template>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
