@@ -11,12 +11,15 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="styles.css?v=20260413r" />
+  <link rel="stylesheet" href="styles.css?v=20260413v" />
 </head>
 <body>
   <main class="app">
     <header class="hero">
-      <h1>What's on in Milton Keynes?</h1>
+      <div class="search-mode" role="tablist" aria-label="Search mode">
+        <button id="mode-discover" class="mode-button is-active" type="button" role="tab" aria-selected="true">Discover</button>
+        <button id="mode-plan" class="mode-button" type="button" role="tab" aria-selected="false">Plan</button>
+      </div>
 
       <form id="search-form" class="search-form" aria-label="Search Milton Keynes listings">
         <label class="sr-only" for="search-input">Search listings in Milton Keynes</label>
@@ -29,6 +32,34 @@
           aria-label="Search listings in Milton Keynes"
         />
         <button type="submit">Search</button>
+      </form>
+
+      <form id="plan-form" class="plan-form" aria-label="Plan in Milton Keynes" hidden>
+        <label class="plan-field" for="plan-when">
+          <span>When</span>
+          <select id="plan-when" name="when">
+            <option value="any">Any time</option>
+            <option value="today">Today</option>
+            <option value="tonight">Tonight</option>
+            <option value="this-week">This week</option>
+            <option value="this-weekend">This weekend</option>
+            <option value="next-30-days">Next 30 days</option>
+          </select>
+        </label>
+
+        <label class="plan-field" for="plan-who">
+          <span>Who</span>
+          <select id="plan-who" name="who">
+            <option value="any">Anyone</option>
+            <option value="families">Families</option>
+            <option value="kids">Kids</option>
+            <option value="couples">Couples</option>
+            <option value="friends">Friends</option>
+            <option value="solo">Solo</option>
+          </select>
+        </label>
+
+        <button type="submit">Find plan</button>
       </form>
 
       <div class="refine-row" aria-label="Refine search results">
@@ -44,6 +75,7 @@
           <select id="sort-filter">
             <option value="relevance">Relevance</option>
             <option value="newest">Newest</option>
+            <option value="popular">Most popular</option>
             <option value="nearby">Nearby</option>
             <option value="name">Name</option>
           </select>
@@ -59,11 +91,6 @@
         <button id="open-operator-panel" class="ghost-button" type="button">Moderate</button>
       </div>
     </header>
-
-    <section id="status-line" class="status-line" aria-live="polite"></section>
-    <section id="nearby-panel" class="nearby-panel" hidden>
-      <div id="nearby-map" class="nearby-map" aria-label="Nearby listings map"></div>
-    </section>
 
     <section id="submit-panel" class="submit-panel" hidden>
       <div class="submit-panel__head">
@@ -173,12 +200,19 @@
       <div id="operator-drafts" class="operator-drafts"></div>
     </section>
 
-    <section class="results-head">
-      <h2>Results</h2>
-      <p id="results-summary">No results yet.</p>
-    </section>
+    <section class="discovery-layout">
+      <section class="discovery-list">
+        <section class="results-head">
+          <h2>Results</h2>
+          <p id="results-summary">No results yet.</p>
+        </section>
+        <section id="results-grid" class="results-grid"></section>
+      </section>
 
-    <section id="results-grid" class="results-grid"></section>
+      <aside id="nearby-panel" class="nearby-panel" hidden>
+        <div id="nearby-map" class="nearby-map" aria-label="Nearby listings map"></div>
+      </aside>
+    </section>
   </main>
 
   <template id="result-card-template">
@@ -198,6 +232,6 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" defer></script>
   <script src="config.js?v=20260413o"></script>
-  <script src="app.js?v=20260413s"></script>
+  <script src="app.js?v=20260413w"></script>
 </body>
 </html>

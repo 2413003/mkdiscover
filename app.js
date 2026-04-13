@@ -59,10 +59,13 @@ const state = {
   categories: [],
   listings: [],
   filtered: [],
+  mode: "discover",
   query: "",
   category: "",
   sort: "relevance",
   openNow: false,
+  planWhen: "any",
+  planWho: "any",
   submitting: false,
   isOperator: false,
   authSession: null,
@@ -77,7 +80,12 @@ const state = {
 };
 
 const els = {
+  modeDiscover: document.getElementById("mode-discover"),
+  modePlan: document.getElementById("mode-plan"),
   form: document.getElementById("search-form"),
+  planForm: document.getElementById("plan-form"),
+  planWhen: document.getElementById("plan-when"),
+  planWho: document.getElementById("plan-who"),
   input: document.getElementById("search-input"),
   category: document.getElementById("category-filter"),
   sort: document.getElementById("sort-filter"),
@@ -121,6 +129,7 @@ init();
 
 async function init() {
   wireEvents();
+  setSearchMode(state.mode);
   setNearbyButtonState();
   const publicKey = config.SUPABASE_PUBLISHABLE_KEY || config.SUPABASE_ANON_KEY;
   state.configured = Boolean(config.SUPABASE_URL && publicKey);
@@ -208,6 +217,16 @@ async function init() {
 }
 
 function wireEvents() {
+  els.modeDiscover?.addEventListener("click", () => {
+    setSearchMode("discover");
+    applyFilters();
+  });
+
+  els.modePlan?.addEventListener("click", () => {
+    setSearchMode("plan");
+    applyFilters();
+  });
+
   els.form.addEventListener("submit", (event) => {
     event.preventDefault();
     state.query = els.input.value.trim();
@@ -216,7 +235,30 @@ function wireEvents() {
 
   els.input.addEventListener("input", () => {
     state.query = els.input.value.trim();
+    if (state.mode === "discover") {
+      applyFilters();
+    }
+  });
+
+  els.planForm?.addEventListener("submit", (event) => {
+    event.preventDefault();
+    state.planWhen = els.planWhen?.value || "any";
+    state.planWho = els.planWho?.value || "any";
     applyFilters();
+  });
+
+  els.planWhen?.addEventListener("change", () => {
+    state.planWhen = els.planWhen.value || "any";
+    if (state.mode === "plan") {
+      applyFilters();
+    }
+  });
+
+  els.planWho?.addEventListener("change", () => {
+    state.planWho = els.planWho.value || "any";
+    if (state.mode === "plan") {
+      applyFilters();
+    }
   });
 
   els.category.addEventListener("change", () => {
@@ -269,6 +311,24 @@ function wireEvents() {
     if (!action || !id) return;
     await handleReviewAction(id, action, button);
   });
+}
+
+function setSearchMode(mode) {
+  const nextMode = mode === "plan" ? "plan" : "discover";
+  state.mode = nextMode;
+
+  const isPlan = nextMode === "plan";
+  if (els.form) {
+    els.form.hidden = isPlan;
+  }
+  if (els.planForm) {
+    els.planForm.hidden = !isPlan;
+  }
+
+  els.modeDiscover?.classList.toggle("is-active", !isPlan);
+  els.modePlan?.classList.toggle("is-active", isPlan);
+  els.modeDiscover?.setAttribute("aria-selected", String(!isPlan));
+  els.modePlan?.setAttribute("aria-selected", String(isPlan));
 }
 
 async function loadCategories() {
@@ -442,11 +502,13 @@ function startBackgroundSync() {
 }
 
 function applyFilters() {
-  const query = normalize(state.query);
+  const query = state.mode === "plan" ? "" : normalize(state.query);
 
   let rows = [...state.listings].filter((row) => {
     if (state.category && row.category_slug !== state.category) return false;
     if (state.openNow && !row.is_active_now) return false;
+    if (state.mode === "plan" && !matchesPlanWhen(row, state.planWhen)) return false;
+    if (state.mode === "plan" && !matchesPlanWho(row, state.planWho)) return false;
     if (!query) return true;
 
     const haystack = [
@@ -477,6 +539,8 @@ function applyFilters() {
     rows.sort((a, b) => (a.title || "").localeCompare(b.title || "", "en-GB"));
   } else if (state.sort === "newest") {
     rows.sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at));
+  } else if (state.sort === "popular") {
+    rows.sort(sortPopularRows);
   } else if (state.sort === "nearby") {
     rows.sort(sortNearbyRows);
   } else {
@@ -518,6 +582,12 @@ function renderSummary() {
     if (nearest) {
       text += ` | nearest ${formatDistance(nearest._distanceKm)}`;
     }
+  }
+
+  if (state.mode === "plan") {
+    const whenLabel = getPlanWhenLabel(state.planWhen);
+    const whoLabel = getPlanWhoLabel(state.planWho);
+    text += ` | ${whenLabel} | ${whoLabel}`;
   }
 
   els.resultsSummary.textContent = text;
@@ -607,13 +677,7 @@ function renderResults(rows) {
 }
 
 function renderNearbyPanel(rows) {
-  const shouldShow = state.nearbyEnabled || state.sort === "nearby";
-  els.nearbyPanel.hidden = !shouldShow;
-
-  if (!shouldShow) {
-    setNearbyMapEmptyState(true);
-    return;
-  }
+  els.nearbyPanel.hidden = false;
 
   if (!state.userLocation) {
     setNearbySummary("Milton Keynes map");
@@ -956,6 +1020,26 @@ function sortNearbyRows(a, b) {
   return b._score - a._score;
 }
 
+function sortPopularRows(a, b) {
+  const aPopularity = computePopularityScore(a);
+  const bPopularity = computePopularityScore(b);
+
+  if (aPopularity !== bPopularity) {
+    return bPopularity - aPopularity;
+  }
+
+  return new Date(b.updated_at) - new Date(a.updated_at);
+}
+
+function computePopularityScore(row) {
+  // Until dedicated engagement signals exist, use the strongest available quality + trust signals.
+  let score = Number(row.quality_score || 0);
+  if (row.verified_at) score += 20;
+  if (row.is_active_now) score += 8;
+  if (row.starts_at) score += 3;
+  return score;
+}
+
 function getDistanceKmForRow(row) {
   if (!state.userLocation) return null;
 
@@ -1055,6 +1139,142 @@ function normalize(value) {
   return String(value || "").trim().toLowerCase();
 }
 
+function matchesPlanWhen(row, planWhen) {
+  const mode = normalize(planWhen || "any");
+  if (mode === "any") return true;
+
+  const startsAt = row?.starts_at ? new Date(row.starts_at) : null;
+  if (!startsAt || Number.isNaN(startsAt.getTime())) return false;
+
+  const now = new Date();
+  const startOfToday = atStartOfDay(now);
+  const endOfToday = atEndOfDay(now);
+
+  if (mode === "today") {
+    return startsAt >= startOfToday && startsAt <= endOfToday;
+  }
+
+  if (mode === "tonight") {
+    const tonightStart = new Date(startOfToday);
+    tonightStart.setHours(17, 0, 0, 0);
+    return startsAt >= tonightStart && startsAt <= endOfToday;
+  }
+
+  if (mode === "this-week") {
+    const weekEnd = atEndOfDay(addDays(startOfToday, 6));
+    return startsAt >= now && startsAt <= weekEnd;
+  }
+
+  if (mode === "this-weekend") {
+    const weekend = getWeekendRange(now);
+    return startsAt >= weekend.start && startsAt <= weekend.end;
+  }
+
+  if (mode === "next-30-days") {
+    const end = atEndOfDay(addDays(startOfToday, 30));
+    return startsAt >= now && startsAt <= end;
+  }
+
+  return true;
+}
+
+function matchesPlanWho(row, planWho) {
+  const mode = normalize(planWho || "any");
+  if (mode === "any") return true;
+
+  const category = normalize(row?.category_slug);
+  const haystack = [
+    row?.title,
+    row?.short_description,
+    row?.long_description,
+    row?.category_slug,
+    ...(Array.isArray(row?.tags) ? row.tags : [])
+  ]
+    .map(normalize)
+    .join(" ");
+
+  const categoryHints = {
+    families: ["family-and-kids", "nurseries-and-childcare", "schools-and-colleges"],
+    kids: ["family-and-kids", "schools-and-colleges", "nurseries-and-childcare", "tutors-and-tuition"],
+    couples: ["music-and-nightlife", "restaurants", "cafes", "pubs-and-bars"],
+    friends: ["clubs-and-communities", "social-groups", "sports-clubs", "events"],
+    solo: ["classes-and-courses", "coworking-and-study-spaces", "parks-and-outdoors"]
+  };
+
+  if ((categoryHints[mode] || []).some((item) => category.includes(item))) {
+    return true;
+  }
+
+  const keywordHints = {
+    families: ["family", "families", "parents", "parent", "baby", "toddler", "all ages", "children", "kids"],
+    kids: ["kid", "kids", "children", "child", "teen", "youth", "play", "school holiday"],
+    couples: ["couple", "date night", "romantic", "for two", "pairs"],
+    friends: ["friends", "group", "social", "team", "mates", "squad"],
+    solo: ["solo", "individual", "one-to-one", "personal", "self-guided", "independent"]
+  };
+
+  return (keywordHints[mode] || []).some((keyword) => haystack.includes(keyword));
+}
+
+function atStartOfDay(value) {
+  const date = new Date(value);
+  date.setHours(0, 0, 0, 0);
+  return date;
+}
+
+function atEndOfDay(value) {
+  const date = new Date(value);
+  date.setHours(23, 59, 59, 999);
+  return date;
+}
+
+function addDays(value, days) {
+  const date = new Date(value);
+  date.setDate(date.getDate() + days);
+  return date;
+}
+
+function getWeekendRange(now) {
+  const today = atStartOfDay(now);
+  const day = today.getDay(); // 0 = Sun, 6 = Sat
+  let saturdayOffset = (6 - day + 7) % 7;
+
+  if (day === 0) {
+    saturdayOffset = -1;
+  }
+
+  const saturday = addDays(today, saturdayOffset);
+  const sunday = addDays(saturday, 1);
+  return {
+    start: atStartOfDay(saturday),
+    end: atEndOfDay(sunday)
+  };
+}
+
+function getPlanWhenLabel(planWhen) {
+  const labels = {
+    any: "Any time",
+    today: "Today",
+    tonight: "Tonight",
+    "this-week": "This week",
+    "this-weekend": "This weekend",
+    "next-30-days": "Next 30 days"
+  };
+  return labels[planWhen] || "Any time";
+}
+
+function getPlanWhoLabel(planWho) {
+  const labels = {
+    any: "Anyone",
+    families: "Families",
+    kids: "Kids",
+    couples: "Couples",
+    friends: "Friends",
+    solo: "Solo"
+  };
+  return labels[planWho] || "Anyone";
+}
+
 function getErrorMessage(error) {
   const message = String(error?.message || error || "").trim();
   if (!message) return "Unknown error";
@@ -1134,6 +1354,8 @@ function haversineDistanceKm(from, to) {
 }
 
 function setStatus(message, tone = "neutral") {
+  if (!els.statusLine) return;
+
   els.statusLine.textContent = message;
 
   if (tone === "neutral") {
