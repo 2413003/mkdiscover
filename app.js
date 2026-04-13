@@ -5,6 +5,12 @@ const INITIAL_LOAD_TIMEOUT_MS = 1500;
 const LISTING_IMAGE_BUCKET = "listing-images";
 const MAX_IMAGE_SIZE_BYTES = 5 * 1024 * 1024;
 const MK_FALLBACK_CENTER = { lat: 52.0406, lng: -0.7594 };
+const MK_LAT_RANGE = { min: 51.95, max: 52.12 };
+const MK_LNG_RANGE = { min: -0.95, max: -0.58 };
+const MK_VIEW_BOUNDS = [
+  [MK_LAT_RANGE.min, MK_LNG_RANGE.min],
+  [MK_LAT_RANGE.max, MK_LNG_RANGE.max]
+];
 const LEAFLET_CSS_URL = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
 const LEAFLET_JS_URL = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
 const DEFAULT_CATEGORIES = [
@@ -676,10 +682,18 @@ async function handleUseLocation() {
       maximumAge: 120000
     });
 
-    state.userLocation = {
+    const nextLocation = {
       lat: position.coords.latitude,
       lng: position.coords.longitude
     };
+
+    if (!isMiltonKeynesCoordinate(nextLocation.lat, nextLocation.lng)) {
+      setNearbySummary("Location is outside Milton Keynes.");
+      setNearbyMapEmptyState(true);
+      return;
+    }
+
+    state.userLocation = nextLocation;
 
     state.sort = "nearby";
     els.sort.value = "nearby";
@@ -750,7 +764,9 @@ async function renderNearbyMap(rows) {
 
   if (!state.map) {
     state.map = window.L.map(els.nearbyMap, {
-      zoomControl: true
+      zoomControl: true,
+      maxBounds: MK_VIEW_BOUNDS,
+      maxBoundsViscosity: 1
     });
 
     window.L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
@@ -759,6 +775,7 @@ async function renderNearbyMap(rows) {
     }).addTo(state.map);
 
     state.mapLayer = window.L.layerGroup().addTo(state.map);
+    state.map.attributionControl.setPrefix("");
   }
 
   state.mapLayer.clearLayers();
@@ -803,6 +820,8 @@ async function renderNearbyMap(rows) {
   } else {
     state.map.fitBounds(bounds, { padding: [24, 24], maxZoom: 14 });
   }
+
+  state.map.setMinZoom(11);
 
   setTimeout(() => {
     state.map?.invalidateSize();
@@ -943,13 +962,39 @@ function getDistanceKmForRow(row) {
 }
 
 function getRowCoordinates(row) {
-  const latitude = Number(row?.latitude);
-  const longitude = Number(row?.longitude);
+  const rawLatitude = row?.latitude;
+  const rawLongitude = row?.longitude;
+
+  if (
+    rawLatitude === null ||
+    rawLatitude === undefined ||
+    rawLatitude === "" ||
+    rawLongitude === null ||
+    rawLongitude === undefined ||
+    rawLongitude === ""
+  ) {
+    return null;
+  }
+
+  const latitude = Number(rawLatitude);
+  const longitude = Number(rawLongitude);
 
   if (Number.isFinite(latitude) && Number.isFinite(longitude)) {
+    if (!isMiltonKeynesCoordinate(latitude, longitude)) {
+      return null;
+    }
     return { lat: latitude, lng: longitude };
   }
   return null;
+}
+
+function isMiltonKeynesCoordinate(latitude, longitude) {
+  return (
+    latitude >= MK_LAT_RANGE.min &&
+    latitude <= MK_LAT_RANGE.max &&
+    longitude >= MK_LNG_RANGE.min &&
+    longitude <= MK_LNG_RANGE.max
+  );
 }
 
 function computeNearbyScore(row) {
