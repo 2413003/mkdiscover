@@ -51,7 +51,7 @@
         </label>
 
         <button id="open-submit-panel" class="ghost-button" type="button">Add listing</button>
-        <button id="open-operator-panel" class="ghost-button" type="button">Review</button>
+        <button id="open-operator-panel" class="ghost-button" type="button">Moderate</button>
       </div>
     </header>
 
@@ -60,7 +60,7 @@
     <section id="submit-panel" class="submit-panel" hidden>
       <div class="submit-panel__head">
         <h2>Add listing</h2>
-        <p>Submissions are reviewed before they go live.</p>
+        <p>Posts go live immediately. Operators can edit or remove them.</p>
       </div>
 
       <form id="submit-form" class="submit-form">
@@ -127,8 +127,8 @@
 
     <section id="operator-panel" class="operator-panel" hidden>
       <div class="operator-panel__head">
-        <h2>Review submissions</h2>
-        <p id="operator-status-text">Sign in to review draft listings.</p>
+        <h2>Moderate listings</h2>
+        <p id="operator-status-text">Sign in to edit or remove listings.</p>
       </div>
 
       <form id="operator-login-form" class="operator-login">
@@ -141,7 +141,7 @@
 
       <div class="operator-actions">
         <button id="operator-claim-button" class="ghost-button" type="button" hidden>Claim operator access</button>
-        <button id="operator-refresh-button" class="ghost-button" type="button" hidden>Refresh drafts</button>
+        <button id="operator-refresh-button" class="ghost-button" type="button" hidden>Refresh listings</button>
         <button id="operator-signout-button" class="ghost-button" type="button" hidden>Sign out</button>
       </div>
 
@@ -171,7 +171,7 @@
   </template>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="config.js?v=20260413c"></script>
-  <script src="app.js?v=20260413c"></script>
+  <script src="config.js?v=20260413d"></script>
+  <script src="app.js?v=20260413d"></script>
 </body>
 </html>

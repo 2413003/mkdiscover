@@ -424,9 +424,14 @@ h1 {
   color: #ffffff;
 }
 
-.review-card__actions button[data-action="archive"] {
+.review-card__actions button[data-action="edit"] {
   background: #eceff2;
   color: #243240;
+}
+
+.review-card__actions button[data-action="delete"] {
+  background: #fceced;
+  color: #7a2e33;
 }
 
 .ghost-button:disabled,

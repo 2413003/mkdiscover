@@ -13,7 +13,8 @@ const state = {
   submitting: false,
   isOperator: false,
   authSession: null,
-  reviewing: false
+  reviewing: false,
+  moderationRows: []
 };
 
 const els = {
@@ -173,11 +174,14 @@ async function loadListings() {
       is_active_now,
       starts_at,
       ends_at,
+      verified_at,
+      source_name,
       updated_at,
       quality_score
     `)
     .eq("status", "published")
     .order("quality_score", { ascending: false })
+    .order("verified_at", { ascending: false, nullsFirst: false })
     .order("updated_at", { ascending: false })
     .limit(300);
 
@@ -283,7 +287,7 @@ function renderResults(rows) {
     } else if (!state.listings.length) {
       empty.innerHTML = `
         <strong>No listings yet</strong>
-        <p>Add a listing, then publish it in Review.</p>
+        <p>Add a listing to get started.</p>
       `;
     } else {
       empty.innerHTML = `
@@ -360,6 +364,8 @@ function makeAction(label, href) {
 
 function computeScore(row, query) {
   let score = Number(row.quality_score || 0);
+  if (!row.verified_at) score -= 6;
+  if (String(row.source_name || "").startsWith("User submission")) score -= 4;
   if (!query) return score;
 
   const title = normalize(row.title);
@@ -482,7 +488,7 @@ async function checkOperatorAccess() {
   console.error(error);
   const message = String(error?.message || "");
   if (message.includes("Could not find the function")) {
-    setOperatorFeedback("Run the latest supabase/schema.sql to enable review mode.", "warn");
+    setOperatorFeedback("Run the latest supabase/schema.sql to enable moderation mode.", "warn");
   } else {
     setOperatorFeedback("Could not verify operator access.", "warn");
   }
@@ -503,7 +509,7 @@ function renderOperatorState() {
   }
 
   if (!state.authSession) {
-    els.operatorStatusText.textContent = "Sign in to review draft listings.";
+    els.operatorStatusText.textContent = "Sign in to edit or remove listings.";
     els.operatorLoginForm.hidden = false;
     els.operatorClaimButton.hidden = true;
     els.operatorRefreshButton.hidden = true;
@@ -630,7 +636,7 @@ async function loadDraftSubmissions() {
 
   state.reviewing = true;
   els.operatorRefreshButton.disabled = true;
-  setOperatorFeedback("Loading drafts...", "neutral");
+  setOperatorFeedback("Loading listings...", "neutral");
 
   const { data, error } = await state.supabase
     .from("search_documents")
@@ -648,7 +654,7 @@ async function loadDraftSubmissions() {
       created_at,
       status
     `)
-    .eq("status", "draft")
+    .in("status", ["published", "draft"])
     .order("created_at", { ascending: false })
     .limit(200);
 
@@ -657,12 +663,13 @@ async function loadDraftSubmissions() {
 
   if (error) {
     console.error(error);
-    setOperatorFeedback("Could not load drafts.", "warn");
+    setOperatorFeedback("Could not load listings.", "warn");
     return;
   }
 
+  state.moderationRows = data || [];
   renderDraftSubmissions(data || []);
-  setOperatorFeedback(`${(data || []).length} draft${(data || []).length === 1 ? "" : "s"} loaded.`, "ok");
+  setOperatorFeedback(`${(data || []).length} listing${(data || []).length === 1 ? "" : "s"} loaded.`, "ok");
 }
 
 function renderDraftSubmissions(rows) {
@@ -672,8 +679,8 @@ function renderDraftSubmissions(rows) {
     const empty = document.createElement("article");
     empty.className = "empty-state";
     empty.innerHTML = `
-      <strong>No drafts</strong>
-      <p>New submissions will appear here.</p>
+      <strong>No listings</strong>
+      <p>No listings found.</p>
     `;
     els.operatorDrafts.appendChild(empty);
     return;
@@ -693,6 +700,7 @@ function renderDraftSubmissions(rows) {
 
     const meta = document.createElement("div");
     meta.className = "review-card__meta";
+    appendMeta(meta, row.status === "published" ? "Live" : humaniseSlug(row.status || "draft"));
     appendMeta(meta, humaniseSlug(row.category_slug || "listing"));
     if (row.address_text) appendMeta(meta, row.address_text);
     if (row.starts_at) appendMeta(meta, `Starts ${formatDateTime(row.starts_at)}`);
@@ -702,19 +710,19 @@ function renderDraftSubmissions(rows) {
     const actions = document.createElement("div");
     actions.className = "review-card__actions";
 
-    const publishButton = document.createElement("button");
-    publishButton.type = "button";
-    publishButton.setAttribute("data-action", "publish");
-    publishButton.setAttribute("data-id", row.id);
-    publishButton.textContent = "Publish";
-    actions.appendChild(publishButton);
+    const editButton = document.createElement("button");
+    editButton.type = "button";
+    editButton.setAttribute("data-action", "edit");
+    editButton.setAttribute("data-id", row.id);
+    editButton.textContent = "Edit";
+    actions.appendChild(editButton);
 
-    const archiveButton = document.createElement("button");
-    archiveButton.type = "button";
-    archiveButton.setAttribute("data-action", "archive");
-    archiveButton.setAttribute("data-id", row.id);
-    archiveButton.textContent = "Archive";
-    actions.appendChild(archiveButton);
+    const deleteButton = document.createElement("button");
+    deleteButton.type = "button";
+    deleteButton.setAttribute("data-action", "delete");
+    deleteButton.setAttribute("data-id", row.id);
+    deleteButton.textContent = "Delete";
+    actions.appendChild(deleteButton);
 
     card.appendChild(actions);
     els.operatorDrafts.appendChild(card);
@@ -723,30 +731,101 @@ function renderDraftSubmissions(rows) {
 
 async function handleReviewAction(id, action, button) {
   if (!state.supabase || !state.isOperator) return;
-  if (!["publish", "archive"].includes(action)) return;
+  if (!["edit", "delete"].includes(action)) return;
+
+  if (action === "edit") {
+    await handleEditListing(id, button);
+    return;
+  }
+
+  const confirmed = window.confirm("Delete this listing?");
+  if (!confirmed) return;
 
   button.disabled = true;
-  setOperatorFeedback(action === "publish" ? "Publishing..." : "Archiving...", "neutral");
-
-  const update = action === "publish"
-    ? { status: "published", verified_at: new Date().toISOString() }
-    : { status: "archived" };
+  setOperatorFeedback("Deleting...", "neutral");
 
   const { error } = await state.supabase
     .from("search_documents")
-    .update(update)
-    .eq("id", id)
-    .eq("status", "draft");
+    .delete()
+    .eq("id", id);
 
   button.disabled = false;
 
   if (error) {
     console.error(error);
-    setOperatorFeedback("Could not save review action.", "warn");
+    setOperatorFeedback("Could not delete listing.", "warn");
     return;
   }
 
-  setOperatorFeedback(action === "publish" ? "Published." : "Archived.", "ok");
+  setOperatorFeedback("Deleted.", "ok");
+  try {
+    await Promise.all([loadDraftSubmissions(), loadListings()]);
+    applyFilters();
+  } catch (refreshError) {
+    console.error(refreshError);
+    setOperatorFeedback("Saved, but refresh failed. Reload page.", "warn");
+  }
+}
+
+async function handleEditListing(id, button) {
+  const row = state.moderationRows.find((item) => item.id === id);
+  if (!row) {
+    setOperatorFeedback("Listing not found in moderation list.", "warn");
+    return;
+  }
+
+  const nextTitle = window.prompt("Title", row.title || "");
+  if (nextTitle === null) return;
+  const title = nextTitle.trim();
+  if (!title) {
+    setOperatorFeedback("Title is required.", "warn");
+    return;
+  }
+
+  const nextDescription = window.prompt("Description", row.short_description || "");
+  if (nextDescription === null) return;
+  const description = nextDescription.trim();
+  if (!description) {
+    setOperatorFeedback("Description is required.", "warn");
+    return;
+  }
+
+  const categoryHint = state.categories.map((category) => category.slug).join(", ");
+  const nextCategory = window.prompt(`Category slug (${categoryHint})`, row.category_slug || "");
+  if (nextCategory === null) return;
+  const categorySlug = nextCategory.trim();
+
+  if (categorySlug && !state.categories.some((category) => category.slug === categorySlug)) {
+    setOperatorFeedback("Category slug not found.", "warn");
+    return;
+  }
+
+  const nextLocation = window.prompt("Location", row.address_text || "");
+  if (nextLocation === null) return;
+  const addressText = nextLocation.trim();
+
+  button.disabled = true;
+  setOperatorFeedback("Saving edit...", "neutral");
+
+  const { error } = await state.supabase
+    .from("search_documents")
+    .update({
+      title,
+      short_description: description,
+      category_slug: categorySlug || null,
+      address_text: addressText || null
+    })
+    .eq("id", id);
+
+  button.disabled = false;
+
+  if (error) {
+    console.error(error);
+    setOperatorFeedback("Could not save edit.", "warn");
+    return;
+  }
+
+  setOperatorFeedback("Saved.", "ok");
   try {
     await Promise.all([loadDraftSubmissions(), loadListings()]);
     applyFilters();
@@ -815,7 +894,7 @@ async function handleSubmitListing(event) {
   state.submitting = true;
   els.submitButton.disabled = true;
   els.submitButton.textContent = "Submitting...";
-  setSubmitFeedback("Submitting for review...", "neutral");
+  setSubmitFeedback("Publishing...", "neutral");
 
   const payload = {
     slug: makeSubmissionSlug(title),
@@ -826,7 +905,7 @@ async function handleSubmitListing(event) {
     booking_url: emptyToNull(bookingUrl),
     address_text: emptyToNull(location),
     tags: parseTags(tagsRaw),
-    status: "draft",
+    status: "published",
     is_active_now: false,
     starts_at: startsAt,
     source_name: submitterName ? `User submission: ${submitterName}` : "User submission",
@@ -855,7 +934,14 @@ async function handleSubmitListing(event) {
   }
 
   els.submitForm.reset();
-  setSubmitFeedback("Thanks. Submitted for review.", "ok");
+  setSubmitFeedback("Posted.", "ok");
+
+  try {
+    await loadListings();
+    applyFilters();
+  } catch (refreshError) {
+    console.error(refreshError);
+  }
 }
 
 function makeSubmissionSlug(title) {
