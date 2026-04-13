@@ -4,6 +4,13 @@ const CACHE_MAX_AGE_MS = 1000 * 60 * 15;
 const INITIAL_LOAD_TIMEOUT_MS = 1500;
 const LISTING_IMAGE_BUCKET = "listing-images";
 const MAX_IMAGE_SIZE_BYTES = 5 * 1024 * 1024;
+const GEOCODE_CACHE_KEY = "mk_discover_geocode_cache_v1";
+const GEOCODE_CACHE_MAX_AGE_MS = 1000 * 60 * 60 * 24 * 30;
+const NEARBY_GEOCODE_LIMIT = 40;
+const GEOCODE_TIMEOUT_MS = 2200;
+const MK_FALLBACK_CENTER = { lat: 52.0406, lng: -0.7594 };
+const LEAFLET_CSS_URL = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
+const LEAFLET_JS_URL = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
 const DEFAULT_CATEGORIES = [
   { slug: "events", name: "Events" },
   { slug: "food-and-drink", name: "Food & Drink" },
@@ -35,7 +42,16 @@ const state = {
   authSession: null,
   reviewing: false,
   moderationRows: [],
-  previewObjectUrl: null
+  previewObjectUrl: null,
+  nearbyEnabled: false,
+  userLocation: null,
+  geocodeCache: {},
+  rowCoordinates: {},
+  geocodeInFlight: false,
+  pendingGeocodeRows: null,
+  leafletPromise: null,
+  map: null,
+  mapLayer: null
 };
 
 const els = {
@@ -44,7 +60,11 @@ const els = {
   category: document.getElementById("category-filter"),
   sort: document.getElementById("sort-filter"),
   openNow: document.getElementById("open-now-filter"),
+  useLocationButton: document.getElementById("use-location-button"),
   statusLine: document.getElementById("status-line"),
+  nearbyPanel: document.getElementById("nearby-panel"),
+  nearbySummary: document.getElementById("nearby-summary"),
+  nearbyMap: document.getElementById("nearby-map"),
   resultsSummary: document.getElementById("results-summary"),
   resultsGrid: document.getElementById("results-grid"),
   cardTemplate: document.getElementById("result-card-template"),
@@ -75,6 +95,8 @@ init();
 
 async function init() {
   wireEvents();
+  state.geocodeCache = loadGeocodeCache();
+  setNearbyButtonState();
   const publicKey = config.SUPABASE_PUBLISHABLE_KEY || config.SUPABASE_ANON_KEY;
   state.configured = Boolean(config.SUPABASE_URL && publicKey);
 
@@ -186,6 +208,8 @@ function wireEvents() {
     state.openNow = els.openNow.checked;
     applyFilters();
   });
+
+  els.useLocationButton.addEventListener("click", handleUseLocation);
 
   els.openSubmitPanel.addEventListener("click", () => {
     els.operatorPanel.hidden = true;
@@ -371,12 +395,20 @@ function applyFilters() {
     return haystack.includes(query);
   });
 
-  rows = rows.map((row) => ({ ...row, _score: computeScore(row, query) }));
+  rows = rows.map((row) => {
+    const nextRow = { ...row };
+    nextRow._score = computeScore(nextRow, query);
+    nextRow._distanceKm = getDistanceKmForRow(nextRow);
+    nextRow._nearbyScore = computeNearbyScore(nextRow);
+    return nextRow;
+  });
 
   if (state.sort === "name") {
     rows.sort((a, b) => (a.title || "").localeCompare(b.title || "", "en-GB"));
   } else if (state.sort === "newest") {
     rows.sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at));
+  } else if (state.sort === "nearby") {
+    rows.sort(sortNearbyRows);
   } else {
     rows.sort((a, b) => b._score - a._score);
   }
@@ -384,6 +416,8 @@ function applyFilters() {
   state.filtered = rows;
   renderSummary();
   renderResults(rows);
+  renderNearbyPanel(rows);
+  queueNearbyGeocoding(rows);
 }
 
 function renderSummary() {
@@ -408,6 +442,13 @@ function renderSummary() {
 
   if (activeNow) {
     text += ` | ${activeNow} open now`;
+  }
+
+  if (state.sort === "nearby" && state.userLocation) {
+    const nearest = state.filtered.find((row) => Number.isFinite(row._distanceKm));
+    if (nearest) {
+      text += ` | nearest ${formatDistance(nearest._distanceKm)}`;
+    }
   }
 
   els.resultsSummary.textContent = text;
@@ -479,6 +520,7 @@ function renderResults(rows) {
     const location = row.address_text || row.postcode;
     if (row.starts_at) appendMeta(metaEl, `Starts ${formatDateTime(row.starts_at)}`);
     if (location) appendMeta(metaEl, location);
+    if (Number.isFinite(row._distanceKm)) appendMeta(metaEl, `${formatDistance(row._distanceKm)} away`);
 
     if (!metaEl.childElementCount) {
       metaEl.remove();
@@ -495,6 +537,400 @@ function renderResults(rows) {
   }
 }
 
+function renderNearbyPanel(rows) {
+  const shouldShow = state.nearbyEnabled || state.sort === "nearby";
+  els.nearbyPanel.hidden = !shouldShow;
+
+  if (!shouldShow) {
+    setNearbyMapEmptyState(true);
+    return;
+  }
+
+  if (!state.userLocation) {
+    setNearbySummary("Use Near me to sort by distance.");
+    setNearbyMapEmptyState(true);
+    return;
+  }
+
+  const nearbyRows = rows.filter((row) => Number.isFinite(row._distanceKm)).slice(0, 30);
+
+  if (!nearbyRows.length) {
+    setNearbySummary("Finding nearby listings...");
+    setNearbyMapEmptyState(true);
+    return;
+  }
+
+  setNearbySummary(`${nearbyRows.length} nearby`);
+  setNearbyMapEmptyState(false);
+  void renderNearbyMap(nearbyRows);
+}
+
+function setNearbySummary(message) {
+  if (els.nearbySummary) {
+    els.nearbySummary.textContent = message;
+  }
+}
+
+function setNearbyMapEmptyState(isEmpty) {
+  if (!els.nearbyMap) return;
+
+  if (isEmpty) {
+    els.nearbyMap.setAttribute("data-empty", "true");
+  } else {
+    els.nearbyMap.removeAttribute("data-empty");
+  }
+}
+
+function setNearbyButtonState() {
+  if (!els.useLocationButton) return;
+  els.useLocationButton.classList.toggle("is-active", Boolean(state.userLocation));
+}
+
+async function handleUseLocation() {
+  if (!("geolocation" in navigator)) {
+    state.nearbyEnabled = true;
+    setNearbyButtonState();
+    renderNearbyPanel(state.filtered);
+    setNearbySummary("Location not available in this browser.");
+    return;
+  }
+
+  state.nearbyEnabled = true;
+  els.useLocationButton.disabled = true;
+  setNearbySummary("Getting your location...");
+  renderNearbyPanel(state.filtered);
+
+  try {
+    const position = await getCurrentPosition({
+      enableHighAccuracy: false,
+      timeout: 7000,
+      maximumAge: 120000
+    });
+
+    state.userLocation = {
+      lat: position.coords.latitude,
+      lng: position.coords.longitude
+    };
+
+    state.sort = "nearby";
+    els.sort.value = "nearby";
+    setNearbyButtonState();
+    applyFilters();
+  } catch (error) {
+    console.error(error);
+    setNearbySummary("Location blocked. Allow location for nearby sort.");
+    setNearbyMapEmptyState(true);
+  } finally {
+    els.useLocationButton.disabled = false;
+  }
+}
+
+function getCurrentPosition(options) {
+  return new Promise((resolve, reject) => {
+    navigator.geolocation.getCurrentPosition(resolve, reject, options);
+  });
+}
+
+function queueNearbyGeocoding(rows) {
+  if (!state.userLocation) return;
+  if (!rows?.length) return;
+
+  if (state.geocodeInFlight) {
+    state.pendingGeocodeRows = rows;
+    return;
+  }
+
+  void runNearbyGeocoding(rows);
+}
+
+async function runNearbyGeocoding(rows) {
+  const pendingByQuery = new Map();
+  let cachedHits = 0;
+  let scanned = 0;
+
+  for (const row of rows) {
+    if (scanned >= NEARBY_GEOCODE_LIMIT) break;
+    if (getRowCoordinates(row)) continue;
+
+    const query = buildGeocodeQuery(row);
+    if (!query) continue;
+
+    scanned += 1;
+    const cached = getCachedGeocode(query);
+    if (cached) {
+      state.rowCoordinates[row.id] = cached;
+      cachedHits += 1;
+      continue;
+    }
+
+    const ids = pendingByQuery.get(query) || [];
+    ids.push(row.id);
+    pendingByQuery.set(query, ids);
+  }
+
+  const candidates = Array.from(pendingByQuery.entries()).map(([query, ids]) => ({ query, ids }));
+
+  if (!candidates.length) {
+    if (cachedHits) {
+      applyFilters();
+    }
+    return;
+  }
+
+  state.geocodeInFlight = true;
+  let changes = cachedHits;
+
+  try {
+    for (let index = 0; index < candidates.length; index += 1) {
+      const candidate = candidates[index];
+      const coordinates = await geocodeQuery(candidate.query);
+      if (!coordinates) continue;
+
+      for (const rowId of candidate.ids) {
+        state.rowCoordinates[rowId] = coordinates;
+      }
+      state.geocodeCache[candidate.query] = {
+        lat: coordinates.lat,
+        lng: coordinates.lng,
+        cachedAt: Date.now()
+      };
+      changes += 1;
+
+      if (index % 6 === 0) {
+        applyFilters();
+      }
+    }
+  } finally {
+    state.geocodeInFlight = false;
+  }
+
+  if (changes) {
+    saveGeocodeCache();
+    applyFilters();
+  }
+
+  if (state.pendingGeocodeRows) {
+    const pendingRows = state.pendingGeocodeRows;
+    state.pendingGeocodeRows = null;
+    queueNearbyGeocoding(pendingRows);
+  }
+}
+
+function buildGeocodeQuery(row) {
+  const address = normalizeInput(row.address_text);
+  const postcode = normalizeInput(row.postcode);
+
+  if (!address && !postcode) {
+    return "";
+  }
+
+  const parts = [address, postcode, "Milton Keynes", "United Kingdom"].filter(Boolean);
+  return parts.join(", ");
+}
+
+function getCachedGeocode(query) {
+  const entry = state.geocodeCache[query];
+  if (!entry) return null;
+
+  if (!Number.isFinite(entry.lat) || !Number.isFinite(entry.lng)) {
+    return null;
+  }
+
+  if (!entry.cachedAt || Date.now() - entry.cachedAt > GEOCODE_CACHE_MAX_AGE_MS) {
+    delete state.geocodeCache[query];
+    return null;
+  }
+
+  return { lat: entry.lat, lng: entry.lng };
+}
+
+async function geocodeQuery(query) {
+  const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&countrycodes=gb&q=${encodeURIComponent(query)}`;
+
+  try {
+    const response = await fetchWithTimeout(
+      url,
+      {
+        headers: {
+          Accept: "application/json"
+        }
+      },
+      GEOCODE_TIMEOUT_MS
+    );
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const data = await response.json();
+    const first = Array.isArray(data) ? data[0] : null;
+    const lat = Number(first?.lat);
+    const lng = Number(first?.lon);
+
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+      return null;
+    }
+
+    return { lat, lng };
+  } catch {
+    return null;
+  }
+}
+
+function fetchWithTimeout(url, options, timeoutMs) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  return fetch(url, { ...options, signal: controller.signal }).finally(() => {
+    clearTimeout(timeoutId);
+  });
+}
+
+function loadGeocodeCache() {
+  try {
+    const raw = window.localStorage.getItem(GEOCODE_CACHE_KEY);
+    if (!raw) return {};
+
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object") return {};
+
+    const next = {};
+    for (const [query, value] of Object.entries(parsed)) {
+      const lat = Number(value?.lat);
+      const lng = Number(value?.lng);
+      const cachedAt = Number(value?.cachedAt || 0);
+
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
+      if (!cachedAt || Date.now() - cachedAt > GEOCODE_CACHE_MAX_AGE_MS) continue;
+
+      next[query] = { lat, lng, cachedAt };
+    }
+    return next;
+  } catch {
+    return {};
+  }
+}
+
+function saveGeocodeCache() {
+  try {
+    window.localStorage.setItem(GEOCODE_CACHE_KEY, JSON.stringify(state.geocodeCache || {}));
+  } catch {
+    // Ignore cache errors.
+  }
+}
+
+async function renderNearbyMap(rows) {
+  try {
+    await ensureLeaflet();
+  } catch {
+    setNearbySummary("Map unavailable right now.");
+    return;
+  }
+
+  if (!state.map) {
+    state.map = window.L.map(els.nearbyMap, {
+      zoomControl: true
+    });
+
+    window.L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 19,
+      attribution: "&copy; OpenStreetMap contributors"
+    }).addTo(state.map);
+
+    state.mapLayer = window.L.layerGroup().addTo(state.map);
+  }
+
+  state.mapLayer.clearLayers();
+  const bounds = [];
+
+  if (state.userLocation) {
+    const point = [state.userLocation.lat, state.userLocation.lng];
+    const userMarker = window.L.circleMarker(point, {
+      radius: 7,
+      weight: 2,
+      color: "#0f62fe",
+      fillColor: "#0f62fe",
+      fillOpacity: 0.2
+    });
+    userMarker.bindPopup("You are here");
+    state.mapLayer.addLayer(userMarker);
+    bounds.push(point);
+  }
+
+  for (const row of rows) {
+    const coordinates = getRowCoordinates(row);
+    if (!coordinates) continue;
+
+    const marker = window.L.marker([coordinates.lat, coordinates.lng]);
+    const title = escapeHtml(row.title || "Listing");
+    const distance = Number.isFinite(row._distanceKm) ? ` (${escapeHtml(formatDistance(row._distanceKm))})` : "";
+    marker.bindPopup(`<strong>${title}</strong>${distance}`);
+    state.mapLayer.addLayer(marker);
+    bounds.push([coordinates.lat, coordinates.lng]);
+  }
+
+  if (!bounds.length) {
+    state.map.setView([MK_FALLBACK_CENTER.lat, MK_FALLBACK_CENTER.lng], 12);
+  } else if (bounds.length === 1) {
+    state.map.setView(bounds[0], 13);
+  } else {
+    state.map.fitBounds(bounds, { padding: [24, 24], maxZoom: 14 });
+  }
+
+  setTimeout(() => {
+    state.map?.invalidateSize();
+  }, 0);
+}
+
+function ensureLeaflet() {
+  if (window.L) {
+    return Promise.resolve(window.L);
+  }
+
+  if (state.leafletPromise) {
+    return state.leafletPromise;
+  }
+
+  state.leafletPromise = new Promise((resolve, reject) => {
+    ensureLeafletCss();
+
+    const existing = document.querySelector(`script[src="${LEAFLET_JS_URL}"]`);
+    if (existing) {
+      existing.addEventListener("load", () => resolve(window.L), { once: true });
+      existing.addEventListener("error", () => reject(new Error("Leaflet failed to load")), { once: true });
+      return;
+    }
+
+    const script = document.createElement("script");
+    script.src = LEAFLET_JS_URL;
+    script.async = true;
+    script.onload = () => resolve(window.L);
+    script.onerror = () => reject(new Error("Leaflet failed to load"));
+    document.head.appendChild(script);
+  });
+
+  return state.leafletPromise;
+}
+
+function ensureLeafletCss() {
+  const existing = document.querySelector(`link[href="${LEAFLET_CSS_URL}"]`);
+  if (existing) return;
+
+  const link = document.createElement("link");
+  link.rel = "stylesheet";
+  link.href = LEAFLET_CSS_URL;
+  document.head.appendChild(link);
+}
+
+function escapeHtml(value) {
+  return String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 function appendMeta(parent, text) {
   const item = document.createElement("span");
   item.className = "meta-pill";
@@ -509,6 +945,78 @@ function makeAction(label, href) {
   link.rel = "noreferrer";
   link.textContent = label;
   return link;
+}
+
+function sortNearbyRows(a, b) {
+  const aHasDistance = Number.isFinite(a._distanceKm);
+  const bHasDistance = Number.isFinite(b._distanceKm);
+
+  if (aHasDistance !== bHasDistance) {
+    return aHasDistance ? -1 : 1;
+  }
+
+  if (aHasDistance && bHasDistance) {
+    if (Boolean(a.is_active_now) !== Boolean(b.is_active_now)) {
+      return a.is_active_now ? -1 : 1;
+    }
+
+    if (a._nearbyScore !== b._nearbyScore) {
+      return b._nearbyScore - a._nearbyScore;
+    }
+
+    if (a._distanceKm !== b._distanceKm) {
+      return a._distanceKm - b._distanceKm;
+    }
+  }
+
+  return b._score - a._score;
+}
+
+function getDistanceKmForRow(row) {
+  if (!state.userLocation) return null;
+
+  const coordinates = getRowCoordinates(row);
+  if (!coordinates) return null;
+
+  return haversineDistanceKm(state.userLocation, coordinates);
+}
+
+function getRowCoordinates(row) {
+  const latitude = Number(row?.latitude);
+  const longitude = Number(row?.longitude);
+
+  if (Number.isFinite(latitude) && Number.isFinite(longitude)) {
+    return { lat: latitude, lng: longitude };
+  }
+
+  const fromMemory = state.rowCoordinates[row.id];
+  if (!fromMemory) return null;
+
+  const cachedLat = Number(fromMemory.lat);
+  const cachedLng = Number(fromMemory.lng);
+  if (!Number.isFinite(cachedLat) || !Number.isFinite(cachedLng)) return null;
+
+  return { lat: cachedLat, lng: cachedLng };
+}
+
+function computeNearbyScore(row) {
+  if (!Number.isFinite(row._distanceKm)) {
+    return -10000 + Number(row._score || 0);
+  }
+
+  let score = Number(row._score || 0) * 0.15;
+  score -= row._distanceKm * 18;
+
+  if (row.is_active_now) {
+    score += 80;
+  }
+
+  const minutesUntilStart = getMinutesUntil(row.starts_at);
+  if (minutesUntilStart !== null && minutesUntilStart >= 0 && minutesUntilStart <= 360) {
+    score += Math.max(0, 48 - minutesUntilStart / 8);
+  }
+
+  return score;
 }
 
 function computeScore(row, query) {
@@ -576,6 +1084,40 @@ function formatDateTime(value) {
   } catch {
     return value;
   }
+}
+
+function getMinutesUntil(value) {
+  if (!value) return null;
+  const startsAt = new Date(value).getTime();
+  if (Number.isNaN(startsAt)) return null;
+  return Math.round((startsAt - Date.now()) / 60000);
+}
+
+function formatDistance(km) {
+  if (!Number.isFinite(km)) return "";
+  if (km < 1) {
+    return `${Math.round(km * 1000)} m`;
+  }
+  return `${km.toFixed(km < 10 ? 1 : 0)} km`;
+}
+
+function haversineDistanceKm(from, to) {
+  const lat1 = Number(from?.lat);
+  const lng1 = Number(from?.lng);
+  const lat2 = Number(to?.lat);
+  const lng2 = Number(to?.lng);
+
+  if (![lat1, lng1, lat2, lng2].every(Number.isFinite)) return null;
+
+  const toRad = (degrees) => (degrees * Math.PI) / 180;
+  const earthRadiusKm = 6371;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) * Math.sin(dLng / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return earthRadiusKm * c;
 }
 
 function setStatus(message, tone = "neutral") {

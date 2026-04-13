@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="styles.css?v=20260413n" />
+  <link rel="stylesheet" href="styles.css?v=20260413p" />
 </head>
 <body>
   <main class="app">
@@ -41,6 +41,7 @@
           <select id="sort-filter">
             <option value="relevance">Relevance</option>
             <option value="newest">Newest</option>
+            <option value="nearby">Nearby</option>
             <option value="name">Name</option>
           </select>
         </label>
@@ -50,12 +51,20 @@
           <span>Open now</span>
         </label>
 
+        <button id="use-location-button" class="ghost-button" type="button">Near me</button>
         <button id="open-submit-panel" class="ghost-button" type="button">Add listing</button>
         <button id="open-operator-panel" class="ghost-button" type="button">Moderate</button>
       </div>
     </header>
 
     <section id="status-line" class="status-line" aria-live="polite"></section>
+    <section id="nearby-panel" class="nearby-panel" hidden>
+      <div class="nearby-panel__head">
+        <h2>Nearby</h2>
+        <p id="nearby-summary">Use Near me to sort by distance.</p>
+      </div>
+      <div id="nearby-map" class="nearby-map" aria-label="Nearby listings map"></div>
+    </section>
 
     <section id="submit-panel" class="submit-panel" hidden>
       <div class="submit-panel__head">
@@ -182,6 +191,6 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="config.js?v=20260413o"></script>
-  <script src="app.js?v=20260413o"></script>
+  <script src="app.js?v=20260413p"></script>
 </body>
 </html>

@@ -172,6 +172,11 @@ h1 {
   cursor: pointer;
 }
 
+.ghost-button.is-active {
+  border-color: #b9c8d7;
+  background: #f3f7fb;
+}
+
 .status-line {
   margin-top: 14px;
   background: var(--surface);
@@ -192,6 +197,59 @@ h1 {
   color: #6f4f10;
   border-color: #e6d5ad;
   background: #fff8e8;
+}
+
+.nearby-panel {
+  margin-top: 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.nearby-panel__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+  background: #fbfcfd;
+}
+
+.nearby-panel__head h2 {
+  margin: 0;
+  font-size: 0.92rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.nearby-panel__head p {
+  margin: 0;
+  color: var(--muted);
+  font-weight: 600;
+  font-size: 0.92rem;
+}
+
+.nearby-map {
+  height: 320px;
+  width: 100%;
+  background: linear-gradient(180deg, #f9fbfc 0%, #eff3f6 100%);
+}
+
+.nearby-map[data-empty="true"] {
+  position: relative;
+}
+
+.nearby-map[data-empty="true"]::after {
+  content: "Nearby markers appear here.";
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+  font-weight: 600;
 }
 
 .submit-panel {
@@ -675,5 +733,14 @@ h1 {
 
   .results-grid {
     grid-template-columns: 1fr;
+  }
+
+  .nearby-panel__head {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .nearby-map {
+    height: 260px;
   }
 }
