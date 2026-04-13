@@ -160,6 +160,18 @@ h1 {
   font-weight: 600;
 }
 
+.ghost-button {
+  min-height: 48px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-weight: 700;
+  padding: 0 16px;
+  cursor: pointer;
+}
+
 .status-line {
   margin-top: 14px;
   background: var(--surface);
@@ -180,6 +192,113 @@ h1 {
   color: #6f4f10;
   border-color: #e6d5ad;
   background: #fff8e8;
+}
+
+.submit-panel {
+  margin-top: 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 16px;
+}
+
+.submit-panel__head {
+  margin-bottom: 12px;
+}
+
+.submit-panel__head h2 {
+  margin: 0;
+  font-size: 1.05rem;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.submit-panel__head p {
+  margin: 6px 0 0;
+  color: var(--muted);
+}
+
+.submit-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.submit-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.submit-field span {
+  font-size: 0.82rem;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.submit-field input,
+.submit-field select,
+.submit-field textarea {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  padding: 10px 12px;
+}
+
+.submit-field textarea {
+  resize: vertical;
+  min-height: 84px;
+}
+
+.submit-field input:focus-visible,
+.submit-field select:focus-visible,
+.submit-field textarea:focus-visible {
+  outline: none;
+  border-color: var(--ring);
+}
+
+.submit-field--wide {
+  grid-column: 1 / -1;
+}
+
+.submit-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.submit-actions button[type="submit"] {
+  min-height: 46px;
+  border: 0;
+  border-radius: 12px;
+  padding: 0 16px;
+  font: inherit;
+  font-weight: 700;
+  color: #ffffff;
+  background: var(--text);
+  cursor: pointer;
+}
+
+.submit-feedback {
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.submit-feedback[data-tone="ok"] {
+  color: #13583a;
+}
+
+.submit-feedback[data-tone="warn"] {
+  color: #8a6414;
 }
 
 .results-head {
@@ -359,6 +478,14 @@ h1 {
 
   .field-toggle {
     flex: 1 1 100%;
+  }
+
+  .ghost-button {
+    width: 100%;
+  }
+
+  .submit-form {
+    grid-template-columns: 1fr;
   }
 
   .results-head {

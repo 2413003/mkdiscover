@@ -9,7 +9,8 @@ const state = {
   query: "",
   category: "",
   sort: "relevance",
-  openNow: false
+  openNow: false,
+  submitting: false
 };
 
 const els = {
@@ -21,7 +22,14 @@ const els = {
   statusLine: document.getElementById("status-line"),
   resultsSummary: document.getElementById("results-summary"),
   resultsGrid: document.getElementById("results-grid"),
-  cardTemplate: document.getElementById("result-card-template")
+  cardTemplate: document.getElementById("result-card-template"),
+  openSubmitPanel: document.getElementById("open-submit-panel"),
+  closeSubmitPanel: document.getElementById("close-submit-panel"),
+  submitPanel: document.getElementById("submit-panel"),
+  submitForm: document.getElementById("submit-form"),
+  submitButton: document.getElementById("submit-button"),
+  submitCategory: document.getElementById("submit-category"),
+  submitFeedback: document.getElementById("submit-feedback")
 };
 
 init();
@@ -48,7 +56,12 @@ async function init() {
     setupRealtime();
   } catch (error) {
     console.error(error);
-    setStatus("Could not load data from Supabase.", "warn");
+    const message = String(error?.message || "");
+    if (message.includes("Could not find the table")) {
+      setStatus("Connected, but required tables are missing. Run supabase/schema.sql.", "warn");
+    } else {
+      setStatus("Could not load data from Supabase.", "warn");
+    }
     applyFilters();
   }
 }
@@ -79,6 +92,16 @@ function wireEvents() {
     state.openNow = els.openNow.checked;
     applyFilters();
   });
+
+  els.openSubmitPanel.addEventListener("click", () => {
+    toggleSubmitPanel(true);
+  });
+
+  els.closeSubmitPanel.addEventListener("click", () => {
+    toggleSubmitPanel(false);
+  });
+
+  els.submitForm.addEventListener("submit", handleSubmitListing);
 }
 
 async function loadCategories() {
@@ -124,12 +147,18 @@ async function loadListings() {
 
 function hydrateFilters() {
   els.category.innerHTML = '<option value="">All categories</option>';
+  els.submitCategory.innerHTML = '<option value="">Select category</option>';
 
   for (const category of state.categories) {
     const option = document.createElement("option");
     option.value = category.slug;
     option.textContent = category.name;
     els.category.appendChild(option);
+
+    const submitOption = document.createElement("option");
+    submitOption.value = category.slug;
+    submitOption.textContent = category.name;
+    els.submitCategory.appendChild(submitOption);
   }
 }
 
@@ -209,7 +238,7 @@ function renderResults(rows) {
     if (!state.configured) {
       empty.innerHTML = `
         <strong>Connect Supabase</strong>
-        <p>Add your Supabase URL and anon key in config.js.</p>
+        <p>Add your Supabase URL and public key in config.js.</p>
       `;
     } else if (!state.listings.length) {
       empty.innerHTML = `
@@ -367,4 +396,138 @@ function setupRealtime() {
       }
     })
     .subscribe();
+}
+
+function toggleSubmitPanel(open) {
+  els.submitPanel.hidden = !open;
+  if (open) {
+    els.submitForm.querySelector("#submit-title")?.focus();
+  } else {
+    setSubmitFeedback("", "neutral");
+  }
+}
+
+async function handleSubmitListing(event) {
+  event.preventDefault();
+  if (state.submitting) return;
+
+  if (!state.configured || !state.supabase) {
+    setSubmitFeedback("Connect Supabase first.", "warn");
+    return;
+  }
+
+  const formData = new FormData(els.submitForm);
+  const title = normalizeInput(formData.get("title"));
+  const categorySlug = normalizeInput(formData.get("category"));
+  const description = normalizeInput(formData.get("description"));
+  const websiteUrl = normalizeInput(formData.get("website_url"));
+  const bookingUrl = normalizeInput(formData.get("booking_url"));
+  const location = normalizeInput(formData.get("location"));
+  const startsAtRaw = normalizeInput(formData.get("starts_at"));
+  const tagsRaw = normalizeInput(formData.get("tags"));
+  const sourceUrl = normalizeInput(formData.get("source_url"));
+  const submitterName = normalizeInput(formData.get("name"));
+
+  if (!title || !categorySlug || !description) {
+    setSubmitFeedback("Add title, category, and description.", "warn");
+    return;
+  }
+
+  let startsAt = null;
+  if (startsAtRaw) {
+    const parsed = new Date(startsAtRaw);
+    if (Number.isNaN(parsed.getTime())) {
+      setSubmitFeedback("Use a valid start date and time.", "warn");
+      return;
+    }
+    startsAt = parsed.toISOString();
+  }
+
+  state.submitting = true;
+  els.submitButton.disabled = true;
+  els.submitButton.textContent = "Submitting...";
+  setSubmitFeedback("Submitting for review...", "neutral");
+
+  const payload = {
+    slug: makeSubmissionSlug(title),
+    title,
+    category_slug: categorySlug,
+    short_description: description,
+    website_url: emptyToNull(websiteUrl),
+    booking_url: emptyToNull(bookingUrl),
+    address_text: emptyToNull(location),
+    tags: parseTags(tagsRaw),
+    status: "draft",
+    is_active_now: false,
+    starts_at: startsAt,
+    source_name: submitterName ? `User submission: ${submitterName}` : "User submission",
+    source_url: emptyToNull(sourceUrl),
+    quality_score: 0
+  };
+
+  const { error } = await state.supabase.from("search_documents").insert(payload);
+  state.submitting = false;
+  els.submitButton.disabled = false;
+  els.submitButton.textContent = "Submit";
+
+  if (error) {
+    console.error(error);
+    const message = String(error?.message || "");
+    if (message.includes("Could not find the table")) {
+      setSubmitFeedback("Run supabase/schema.sql first.", "warn");
+      return;
+    }
+    if (message.toLowerCase().includes("row-level security")) {
+      setSubmitFeedback("Submission policy missing. Run latest schema SQL.", "warn");
+      return;
+    }
+    setSubmitFeedback("Could not submit right now. Try again.", "warn");
+    return;
+  }
+
+  els.submitForm.reset();
+  setSubmitFeedback("Thanks. Submitted for review.", "ok");
+}
+
+function makeSubmissionSlug(title) {
+  const base = slugify(title).slice(0, 42) || "listing";
+  const randomPart = Math.random().toString(36).slice(2, 8);
+  return `sub-${base}-${randomPart}`;
+}
+
+function slugify(value) {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+function parseTags(raw) {
+  if (!raw) return [];
+
+  const parts = raw
+    .split(",")
+    .map((tag) => tag.trim())
+    .filter(Boolean);
+
+  return [...new Set(parts)].slice(0, 8);
+}
+
+function normalizeInput(value) {
+  return String(value || "").trim();
+}
+
+function emptyToNull(value) {
+  return value ? value : null;
+}
+
+function setSubmitFeedback(message, tone) {
+  els.submitFeedback.textContent = message;
+
+  if (tone === "neutral") {
+    els.submitFeedback.removeAttribute("data-tone");
+    return;
+  }
+
+  els.submitFeedback.setAttribute("data-tone", tone);
 }

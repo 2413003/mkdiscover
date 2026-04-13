@@ -49,10 +49,80 @@
           <input id="open-now-filter" type="checkbox" />
           <span>Open now</span>
         </label>
+
+        <button id="open-submit-panel" class="ghost-button" type="button">Add listing</button>
       </div>
     </header>
 
     <section id="status-line" class="status-line" aria-live="polite"></section>
+
+    <section id="submit-panel" class="submit-panel" hidden>
+      <div class="submit-panel__head">
+        <h2>Add listing</h2>
+        <p>Submissions are reviewed before they go live.</p>
+      </div>
+
+      <form id="submit-form" class="submit-form">
+        <label class="submit-field" for="submit-title">
+          <span>Title</span>
+          <input id="submit-title" name="title" type="text" maxlength="120" required />
+        </label>
+
+        <label class="submit-field" for="submit-category">
+          <span>Category</span>
+          <select id="submit-category" name="category" required>
+            <option value="">Select category</option>
+          </select>
+        </label>
+
+        <label class="submit-field submit-field--wide" for="submit-description">
+          <span>Description</span>
+          <textarea id="submit-description" name="description" rows="3" maxlength="400" required></textarea>
+        </label>
+
+        <label class="submit-field" for="submit-website-url">
+          <span>Website URL</span>
+          <input id="submit-website-url" name="website_url" type="url" placeholder="https://..." />
+        </label>
+
+        <label class="submit-field" for="submit-booking-url">
+          <span>Booking URL</span>
+          <input id="submit-booking-url" name="booking_url" type="url" placeholder="https://..." />
+        </label>
+
+        <label class="submit-field" for="submit-location">
+          <span>Location</span>
+          <input id="submit-location" name="location" type="text" maxlength="180" placeholder="Area, venue, or postcode" />
+        </label>
+
+        <label class="submit-field" for="submit-starts-at">
+          <span>Starts (optional)</span>
+          <input id="submit-starts-at" name="starts_at" type="datetime-local" />
+        </label>
+
+        <label class="submit-field" for="submit-tags">
+          <span>Tags</span>
+          <input id="submit-tags" name="tags" type="text" maxlength="140" placeholder="chess, live music, brunch" />
+        </label>
+
+        <label class="submit-field" for="submit-source-url">
+          <span>Source URL</span>
+          <input id="submit-source-url" name="source_url" type="url" placeholder="https://..." />
+        </label>
+
+        <label class="submit-field" for="submit-name">
+          <span>Your name</span>
+          <input id="submit-name" name="name" type="text" maxlength="80" />
+        </label>
+
+        <div class="submit-actions">
+          <button id="submit-button" type="submit">Submit</button>
+          <button id="close-submit-panel" class="ghost-button" type="button">Close</button>
+        </div>
+      </form>
+
+      <p id="submit-feedback" class="submit-feedback" aria-live="polite"></p>
+    </section>
 
     <section class="results-head">
       <h2>Results</h2>
@@ -76,7 +146,7 @@
   </template>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="config.js"></script>
-  <script src="app.js"></script>
+  <script src="config.js?v=20260413b"></script>
+  <script src="app.js?v=20260413b"></script>
 </body>
 </html>
