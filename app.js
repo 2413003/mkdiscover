@@ -1,4 +1,7 @@
 const config = window.MK_DISCOVER_CONFIG || {};
+const CACHE_KEY = "mk_discover_cache_v1";
+const CACHE_MAX_AGE_MS = 1000 * 60 * 15;
+const INITIAL_LOAD_TIMEOUT_MS = 900;
 const DEFAULT_CATEGORIES = [
   { slug: "events", name: "Events" },
   { slug: "food-and-drink", name: "Food & Drink" },
@@ -76,6 +79,8 @@ async function init() {
     return;
   }
 
+  const hasCache = hydrateFromCache();
+
   state.supabasePublic = window.supabase.createClient(config.SUPABASE_URL, publicKey, {
     auth: {
       persistSession: false,
@@ -85,10 +90,13 @@ async function init() {
   });
   state.supabaseAuth = window.supabase.createClient(config.SUPABASE_URL, publicKey);
   setupAuthSubscription();
-  setStatus("Loading live Milton Keynes data...");
+  setStatus(hasCache ? "Showing saved results. Syncing..." : "Loading live Milton Keynes data...");
 
   try {
-    const [categoriesResult, listingsResult] = await Promise.allSettled([loadCategories(), loadListings()]);
+    const [categoriesResult, listingsResult] = await Promise.allSettled([
+      withTimeout(loadCategories(), INITIAL_LOAD_TIMEOUT_MS, "categories"),
+      withTimeout(loadListings(), INITIAL_LOAD_TIMEOUT_MS, "listings")
+    ]);
     const issues = [];
 
     if (categoriesResult.status === "rejected") {
@@ -107,23 +115,45 @@ async function init() {
 
     ensureCategoriesAvailable();
     hydrateFilters();
-    await refreshOperatorState();
     applyFilters();
+    if (state.listings.length) {
+      saveCache();
+    }
+    refreshOperatorState().catch((error) => {
+      if (!isAuthLockError(error)) {
+        console.error(error);
+      }
+    });
 
     if (!issues.length) {
       setStatus("Live data connected.", "ok");
+      saveCache();
+    } else if (hasCache) {
+      setStatus("Using saved results while live sync retries.", "warn");
     } else {
       setStatus(`Supabase issue - ${issues[0]}`, "warn");
     }
 
     setupRealtime();
+    if (issues.length) {
+      startBackgroundSync();
+    }
   } catch (error) {
     console.error(error);
-    setStatus(`Supabase issue - ${getErrorMessage(error)}`, "warn");
+    if (hasCache) {
+      setStatus("Using saved results while live sync retries.", "warn");
+    } else {
+      setStatus(`Supabase issue - ${getErrorMessage(error)}`, "warn");
+    }
     ensureCategoriesAvailable();
     hydrateFilters();
-    await refreshOperatorState();
     applyFilters();
+    refreshOperatorState().catch((authError) => {
+      if (!isAuthLockError(authError)) {
+        console.error(authError);
+      }
+    });
+    startBackgroundSync();
   }
 }
 
@@ -223,9 +253,8 @@ async function loadListings() {
     `)
     .eq("status", "published")
     .order("quality_score", { ascending: false })
-    .order("verified_at", { ascending: false, nullsFirst: false })
     .order("updated_at", { ascending: false })
-    .limit(300);
+    .limit(160);
 
   if (error) throw error;
   state.listings = data || [];
@@ -251,6 +280,57 @@ function hydrateFilters() {
 function ensureCategoriesAvailable() {
   if (Array.isArray(state.categories) && state.categories.length) return;
   state.categories = [...DEFAULT_CATEGORIES];
+}
+
+function hydrateFromCache() {
+  try {
+    const raw = window.localStorage.getItem(CACHE_KEY);
+    if (!raw) return false;
+
+    const parsed = JSON.parse(raw);
+    const cachedAt = Number(parsed?.cachedAt || 0);
+    if (!cachedAt || Date.now() - cachedAt > CACHE_MAX_AGE_MS) return false;
+
+    state.categories = Array.isArray(parsed.categories) ? parsed.categories : [];
+    state.listings = Array.isArray(parsed.listings) ? parsed.listings : [];
+    ensureCategoriesAvailable();
+    hydrateFilters();
+    applyFilters();
+    return Boolean(state.listings.length || state.categories.length);
+  } catch {
+    return false;
+  }
+}
+
+function saveCache() {
+  try {
+    window.localStorage.setItem(
+      CACHE_KEY,
+      JSON.stringify({
+        cachedAt: Date.now(),
+        categories: state.categories || [],
+        listings: state.listings || []
+      })
+    );
+  } catch {
+    // Ignore cache write errors (private mode or quota).
+  }
+}
+
+function startBackgroundSync() {
+  Promise.all([loadCategories(), loadListings()])
+    .then(() => {
+      ensureCategoriesAvailable();
+      hydrateFilters();
+      applyFilters();
+      saveCache();
+      setStatus("Live data connected.", "ok");
+    })
+    .catch((error) => {
+      if (!isAuthLockError(error)) {
+        console.error(error);
+      }
+    });
 }
 
 function applyFilters() {
@@ -499,6 +579,7 @@ function setupRealtime() {
       try {
         await loadListings();
         applyFilters();
+        saveCache();
       } catch (error) {
         console.error(error);
         setStatus("Live update failed. Refresh to retry.", "warn");
@@ -860,6 +941,7 @@ async function handleReviewAction(id, action, button) {
   try {
     await Promise.all([loadDraftSubmissions(), loadListings()]);
     applyFilters();
+    saveCache();
   } catch (refreshError) {
     console.error(refreshError);
     setOperatorFeedback("Saved, but refresh failed. Reload page.", "warn");
@@ -928,6 +1010,7 @@ async function handleEditListing(id, button) {
   try {
     await Promise.all([loadDraftSubmissions(), loadListings()]);
     applyFilters();
+    saveCache();
   } catch (refreshError) {
     console.error(refreshError);
     setOperatorFeedback("Saved, but refresh failed. Reload page.", "warn");
@@ -1045,6 +1128,7 @@ async function handleSubmitListing(event) {
   try {
     await loadListings();
     applyFilters();
+    saveCache();
   } catch (refreshError) {
     console.error(refreshError);
   }
@@ -1084,6 +1168,22 @@ function emptyToNull(value) {
 
 function wait(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function withTimeout(promise, timeoutMs, label) {
+  let timerId;
+
+  const timeoutPromise = new Promise((_, reject) => {
+    timerId = setTimeout(() => {
+      reject(new Error(`${label} request timed out`));
+    }, timeoutMs);
+  });
+
+  try {
+    return await Promise.race([promise, timeoutPromise]);
+  } finally {
+    clearTimeout(timerId);
+  }
 }
 
 function setSubmitFeedback(message, tone) {
