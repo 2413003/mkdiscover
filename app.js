@@ -28,7 +28,8 @@ init();
 
 async function init() {
   wireEvents();
-  state.configured = Boolean(config.SUPABASE_URL && config.SUPABASE_ANON_KEY);
+  const publicKey = config.SUPABASE_PUBLISHABLE_KEY || config.SUPABASE_ANON_KEY;
+  state.configured = Boolean(config.SUPABASE_URL && publicKey);
 
   if (!state.configured) {
     renderDisconnectedState();
@@ -36,7 +37,7 @@ async function init() {
     return;
   }
 
-  state.supabase = window.supabase.createClient(config.SUPABASE_URL, config.SUPABASE_ANON_KEY);
+  state.supabase = window.supabase.createClient(config.SUPABASE_URL, publicKey);
   setStatus("Loading live Milton Keynes data...");
 
   try {
@@ -348,7 +349,7 @@ function setStatus(message, tone = "neutral") {
 }
 
 function renderDisconnectedState() {
-  setStatus("Set Supabase keys in config.js to load real data.", "warn");
+  setStatus("Set Supabase URL and public key in config.js to load real data.", "warn");
 }
 
 function setupRealtime() {
