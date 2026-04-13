@@ -1,4 +1,18 @@
 const config = window.MK_DISCOVER_CONFIG || {};
+const DEFAULT_CATEGORIES = [
+  { slug: "events", name: "Events" },
+  { slug: "food-and-drink", name: "Food & Drink" },
+  { slug: "clubs-and-communities", name: "Clubs & Communities" },
+  { slug: "fitness-and-sport", name: "Fitness & Sport" },
+  { slug: "classes-and-courses", name: "Classes & Courses" },
+  { slug: "venues-and-spaces", name: "Venues & Spaces" },
+  { slug: "volunteering", name: "Volunteering" },
+  { slug: "jobs", name: "Jobs" },
+  { slug: "family-and-kids", name: "Family & Kids" },
+  { slug: "arts-and-culture", name: "Arts & Culture" },
+  { slug: "nightlife", name: "Nightlife" },
+  { slug: "services", name: "Services" }
+];
 
 const state = {
   supabase: null,
@@ -79,6 +93,7 @@ async function init() {
       issues.push(`listings: ${getErrorMessage(listingsResult.reason)}`);
     }
 
+    ensureCategoriesAvailable();
     hydrateFilters();
     await refreshOperatorState();
     applyFilters();
@@ -93,6 +108,8 @@ async function init() {
   } catch (error) {
     console.error(error);
     setStatus(`Supabase issue - ${getErrorMessage(error)}`, "warn");
+    ensureCategoriesAvailable();
+    hydrateFilters();
     await refreshOperatorState();
     applyFilters();
   }
@@ -217,6 +234,11 @@ function hydrateFilters() {
     submitOption.textContent = category.name;
     els.submitCategory.appendChild(submitOption);
   }
+}
+
+function ensureCategoriesAvailable() {
+  if (Array.isArray(state.categories) && state.categories.length) return;
+  state.categories = [...DEFAULT_CATEGORIES];
 }
 
 function applyFilters() {
@@ -416,6 +438,15 @@ function getErrorMessage(error) {
   return message;
 }
 
+function isAuthLockError(error) {
+  const message = getErrorMessage(error).toLowerCase();
+  return (
+    message.includes("lock:sb-") &&
+    message.includes("auth-token") &&
+    (message.includes("stole it") || message.includes("released"))
+  );
+}
+
 function humaniseSlug(slug) {
   return slug.replace(/[-_]/g, " ").replace(/\b\w/g, (character) => character.toUpperCase());
 }
@@ -468,7 +499,13 @@ function setupAuthSubscription() {
   if (!state.supabase?.auth) return;
 
   state.supabase.auth.onAuthStateChange(async () => {
-    await refreshOperatorState();
+    try {
+      await refreshOperatorState();
+    } catch (error) {
+      if (!isAuthLockError(error)) {
+        console.error(error);
+      }
+    }
   });
 }
 
@@ -480,8 +517,38 @@ async function refreshOperatorState() {
     return;
   }
 
-  const { data, error } = await state.supabase.auth.getSession();
+  let sessionResult;
+  try {
+    sessionResult = await state.supabase.auth.getSession();
+  } catch (error) {
+    if (isAuthLockError(error)) {
+      // Transient lock contention in Supabase auth refresh.
+      setTimeout(() => {
+        refreshOperatorState().catch((retryError) => {
+          if (!isAuthLockError(retryError)) {
+            console.error(retryError);
+          }
+        });
+      }, 180);
+      return;
+    }
+
+    throw error;
+  }
+
+  const { data, error } = sessionResult;
   if (error) {
+    if (isAuthLockError(error)) {
+      setTimeout(() => {
+        refreshOperatorState().catch((retryError) => {
+          if (!isAuthLockError(retryError)) {
+            console.error(retryError);
+          }
+        });
+      }, 180);
+      return;
+    }
+
     console.error(error);
     setOperatorFeedback("Could not read sign-in session.", "warn");
     state.authSession = null;
