@@ -15,7 +15,8 @@ const DEFAULT_CATEGORIES = [
 ];
 
 const state = {
-  supabase: null,
+  supabasePublic: null,
+  supabaseAuth: null,
   configured: false,
   categories: [],
   listings: [],
@@ -75,7 +76,14 @@ async function init() {
     return;
   }
 
-  state.supabase = window.supabase.createClient(config.SUPABASE_URL, publicKey);
+  state.supabasePublic = window.supabase.createClient(config.SUPABASE_URL, publicKey, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+      detectSessionInUrl: false
+    }
+  });
+  state.supabaseAuth = window.supabase.createClient(config.SUPABASE_URL, publicKey);
   setupAuthSubscription();
   setStatus("Loading live Milton Keynes data...");
 
@@ -180,7 +188,7 @@ function wireEvents() {
 }
 
 async function loadCategories() {
-  const { data, error } = await state.supabase
+  const { data, error } = await state.supabasePublic
     .from("categories")
     .select("slug, name")
     .eq("is_active", true)
@@ -191,7 +199,7 @@ async function loadCategories() {
 }
 
 async function loadListings() {
-  const { data, error } = await state.supabase
+  const { data, error } = await state.supabasePublic
     .from("search_documents")
     .select(`
       id,
@@ -483,9 +491,9 @@ function renderDisconnectedState() {
 }
 
 function setupRealtime() {
-  if (!config.ENABLE_REALTIME || !state.supabase) return;
+  if (!config.ENABLE_REALTIME || !state.supabasePublic) return;
 
-  state.supabase
+  state.supabasePublic
     .channel("search_documents_changes")
     .on("postgres_changes", { event: "*", schema: "public", table: "search_documents" }, async () => {
       try {
@@ -500,9 +508,9 @@ function setupRealtime() {
 }
 
 function setupAuthSubscription() {
-  if (!state.supabase?.auth) return;
+  if (!state.supabaseAuth?.auth) return;
 
-  state.supabase.auth.onAuthStateChange(async () => {
+  state.supabaseAuth.auth.onAuthStateChange(async () => {
     try {
       await refreshOperatorState();
     } catch (error) {
@@ -514,7 +522,7 @@ function setupAuthSubscription() {
 }
 
 async function refreshOperatorState() {
-  if (!state.supabase?.auth) {
+  if (!state.supabaseAuth?.auth) {
     state.authSession = null;
     state.isOperator = false;
     renderOperatorState();
@@ -523,7 +531,7 @@ async function refreshOperatorState() {
 
   let sessionResult;
   try {
-    sessionResult = await state.supabase.auth.getSession();
+    sessionResult = await state.supabaseAuth.auth.getSession();
   } catch (error) {
     if (isAuthLockError(error)) {
       // Transient lock contention in Supabase auth refresh.
@@ -573,7 +581,7 @@ async function refreshOperatorState() {
 async function checkOperatorAccess() {
   if (!state.authSession) return false;
 
-  const { data, error } = await state.supabase.rpc("is_operator");
+  const { data, error } = await state.supabaseAuth.rpc("is_operator");
   if (!error) return Boolean(data);
 
   console.error(error);
@@ -634,7 +642,7 @@ function toggleOperatorPanel() {
 
 async function handleOperatorLogin(event) {
   event.preventDefault();
-  if (!state.configured || !state.supabase) {
+  if (!state.configured || !state.supabaseAuth) {
     setOperatorFeedback("Connect Supabase first.", "warn");
     return;
   }
@@ -650,7 +658,7 @@ async function handleOperatorLogin(event) {
   setOperatorFeedback("Sending sign-in link...", "neutral");
 
   const redirectTo = window.location.href.split("#")[0];
-  const { error } = await state.supabase.auth.signInWithOtp({
+  const { error } = await state.supabaseAuth.auth.signInWithOtp({
     email,
     options: { emailRedirectTo: redirectTo }
   });
@@ -668,7 +676,7 @@ async function handleOperatorLogin(event) {
 }
 
 async function handleClaimOperator() {
-  if (!state.authSession || !state.supabase) {
+  if (!state.authSession || !state.supabaseAuth) {
     setOperatorFeedback("Sign in first.", "warn");
     return;
   }
@@ -682,7 +690,7 @@ async function handleClaimOperator() {
   els.operatorClaimButton.disabled = true;
   setOperatorFeedback("Claiming operator access...", "neutral");
 
-  const { error } = await state.supabase.from("operator_emails").insert({ email, is_active: true });
+  const { error } = await state.supabaseAuth.from("operator_emails").insert({ email, is_active: true });
   els.operatorClaimButton.disabled = false;
 
   if (error) {
@@ -706,9 +714,9 @@ async function handleClaimOperator() {
 }
 
 async function handleOperatorSignOut() {
-  if (!state.supabase?.auth) return;
+  if (!state.supabaseAuth?.auth) return;
 
-  const { error } = await state.supabase.auth.signOut();
+  const { error } = await state.supabaseAuth.auth.signOut();
   if (error) {
     console.error(error);
     setOperatorFeedback("Could not sign out.", "warn");
@@ -723,13 +731,13 @@ async function handleOperatorSignOut() {
 }
 
 async function loadDraftSubmissions() {
-  if (!state.supabase || !state.isOperator) return;
+  if (!state.supabaseAuth || !state.isOperator) return;
 
   state.reviewing = true;
   els.operatorRefreshButton.disabled = true;
   setOperatorFeedback("Loading listings...", "neutral");
 
-  const { data, error } = await state.supabase
+  const { data, error } = await state.supabaseAuth
     .from("search_documents")
     .select(`
       id,
@@ -821,7 +829,7 @@ function renderDraftSubmissions(rows) {
 }
 
 async function handleReviewAction(id, action, button) {
-  if (!state.supabase || !state.isOperator) return;
+  if (!state.supabaseAuth || !state.isOperator) return;
   if (!["edit", "delete"].includes(action)) return;
 
   if (action === "edit") {
@@ -835,7 +843,7 @@ async function handleReviewAction(id, action, button) {
   button.disabled = true;
   setOperatorFeedback("Deleting...", "neutral");
 
-  const { error } = await state.supabase
+  const { error } = await state.supabaseAuth
     .from("search_documents")
     .delete()
     .eq("id", id);
@@ -898,7 +906,7 @@ async function handleEditListing(id, button) {
   button.disabled = true;
   setOperatorFeedback("Saving edit...", "neutral");
 
-  const { error } = await state.supabase
+  const { error } = await state.supabaseAuth
     .from("search_documents")
     .update({
       title,
@@ -950,7 +958,7 @@ async function handleSubmitListing(event) {
   event.preventDefault();
   if (state.submitting) return;
 
-  if (!state.configured || !state.supabase) {
+  if (!state.configured || !state.supabasePublic) {
     setSubmitFeedback("Connect Supabase first.", "warn");
     return;
   }
@@ -1004,14 +1012,21 @@ async function handleSubmitListing(event) {
     quality_score: 0
   };
 
-  const { error } = await state.supabase.from("search_documents").insert(payload);
+  let { error } = await state.supabasePublic.from("search_documents").insert(payload);
+
+  if (error && isAuthLockError(error)) {
+    await wait(180);
+    const retry = await state.supabasePublic.from("search_documents").insert(payload);
+    error = retry.error;
+  }
+
   state.submitting = false;
   els.submitButton.disabled = false;
   els.submitButton.textContent = "Submit";
 
   if (error) {
     console.error(error);
-    const message = String(error?.message || "");
+    const message = getErrorMessage(error);
     if (message.includes("Could not find the table")) {
       setSubmitFeedback("Run supabase/schema.sql first.", "warn");
       return;
@@ -1020,7 +1035,7 @@ async function handleSubmitListing(event) {
       setSubmitFeedback("Submission policy missing. Run latest schema SQL.", "warn");
       return;
     }
-    setSubmitFeedback("Could not submit right now. Try again.", "warn");
+    setSubmitFeedback(`Could not submit: ${message}`, "warn");
     return;
   }
 
@@ -1065,6 +1080,10 @@ function normalizeInput(value) {
 
 function emptyToNull(value) {
   return value ? value : null;
+}
+
+function wait(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function setSubmitFeedback(message, tone) {
