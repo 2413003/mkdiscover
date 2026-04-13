@@ -76,7 +76,8 @@ const state = {
   userLocation: null,
   leafletPromise: null,
   map: null,
-  mapLayer: null
+  mapLayer: null,
+  mapZoomControl: null
 };
 
 const els = {
@@ -832,7 +833,7 @@ async function renderNearbyMap(rows) {
 
   if (!state.map) {
     state.map = window.L.map(els.nearbyMap, {
-      zoomControl: true,
+      zoomControl: false,
       maxBounds: MK_VIEW_BOUNDS,
       maxBoundsViscosity: 1
     });
@@ -844,6 +845,7 @@ async function renderNearbyMap(rows) {
 
     state.mapLayer = window.L.layerGroup().addTo(state.map);
     state.map.attributionControl.setPrefix("");
+    state.mapZoomControl = window.L.control.zoom({ position: "topright" }).addTo(state.map);
   }
 
   state.mapLayer.clearLayers();
