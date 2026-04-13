@@ -66,20 +66,33 @@ async function init() {
   setStatus("Loading live Milton Keynes data...");
 
   try {
-    await Promise.all([loadCategories(), loadListings()]);
+    const [categoriesResult, listingsResult] = await Promise.allSettled([loadCategories(), loadListings()]);
+    const issues = [];
+
+    if (categoriesResult.status === "rejected") {
+      state.categories = [];
+      issues.push(`categories: ${getErrorMessage(categoriesResult.reason)}`);
+    }
+
+    if (listingsResult.status === "rejected") {
+      state.listings = [];
+      issues.push(`listings: ${getErrorMessage(listingsResult.reason)}`);
+    }
+
     hydrateFilters();
     await refreshOperatorState();
     applyFilters();
-    setStatus("Live data connected.", "ok");
+
+    if (!issues.length) {
+      setStatus("Live data connected.", "ok");
+    } else {
+      setStatus(`Supabase issue - ${issues[0]}`, "warn");
+    }
+
     setupRealtime();
   } catch (error) {
     console.error(error);
-    const message = String(error?.message || "");
-    if (message.includes("Could not find the table")) {
-      setStatus("Connected, but required tables are missing. Run supabase/schema.sql.", "warn");
-    } else {
-      setStatus("Could not load data from Supabase.", "warn");
-    }
+    setStatus(`Supabase issue - ${getErrorMessage(error)}`, "warn");
     await refreshOperatorState();
     applyFilters();
   }
@@ -394,6 +407,13 @@ function normaliseTags(tags) {
 
 function normalize(value) {
   return String(value || "").trim().toLowerCase();
+}
+
+function getErrorMessage(error) {
+  const message = String(error?.message || error || "").trim();
+  if (!message) return "Unknown error";
+  if (message.includes("Could not find the table")) return "Missing tables. Run supabase/schema.sql.";
+  return message;
 }
 
 function humaniseSlug(slug) {
