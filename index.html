@@ -51,6 +51,7 @@
         </label>
 
         <button id="open-submit-panel" class="ghost-button" type="button">Add listing</button>
+        <button id="open-operator-panel" class="ghost-button" type="button">Review</button>
       </div>
     </header>
 
@@ -124,6 +125,30 @@
       <p id="submit-feedback" class="submit-feedback" aria-live="polite"></p>
     </section>
 
+    <section id="operator-panel" class="operator-panel" hidden>
+      <div class="operator-panel__head">
+        <h2>Review submissions</h2>
+        <p id="operator-status-text">Sign in to review draft listings.</p>
+      </div>
+
+      <form id="operator-login-form" class="operator-login">
+        <label class="submit-field" for="operator-email">
+          <span>Operator email</span>
+          <input id="operator-email" name="operator_email" type="email" required placeholder="you@example.com" />
+        </label>
+        <button id="operator-login-button" type="submit">Send sign-in link</button>
+      </form>
+
+      <div class="operator-actions">
+        <button id="operator-claim-button" class="ghost-button" type="button" hidden>Claim operator access</button>
+        <button id="operator-refresh-button" class="ghost-button" type="button" hidden>Refresh drafts</button>
+        <button id="operator-signout-button" class="ghost-button" type="button" hidden>Sign out</button>
+      </div>
+
+      <p id="operator-feedback" class="operator-feedback" aria-live="polite"></p>
+      <div id="operator-drafts" class="operator-drafts"></div>
+    </section>
+
     <section class="results-head">
       <h2>Results</h2>
       <p id="results-summary">No results yet.</p>
@@ -146,7 +171,7 @@
   </template>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="config.js?v=20260413b"></script>
-  <script src="app.js?v=20260413b"></script>
+  <script src="config.js?v=20260413c"></script>
+  <script src="app.js?v=20260413c"></script>
 </body>
 </html>

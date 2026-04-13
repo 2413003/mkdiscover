@@ -10,7 +10,10 @@ const state = {
   category: "",
   sort: "relevance",
   openNow: false,
-  submitting: false
+  submitting: false,
+  isOperator: false,
+  authSession: null,
+  reviewing: false
 };
 
 const els = {
@@ -29,7 +32,18 @@ const els = {
   submitForm: document.getElementById("submit-form"),
   submitButton: document.getElementById("submit-button"),
   submitCategory: document.getElementById("submit-category"),
-  submitFeedback: document.getElementById("submit-feedback")
+  submitFeedback: document.getElementById("submit-feedback"),
+  openOperatorPanel: document.getElementById("open-operator-panel"),
+  operatorPanel: document.getElementById("operator-panel"),
+  operatorStatusText: document.getElementById("operator-status-text"),
+  operatorLoginForm: document.getElementById("operator-login-form"),
+  operatorLoginButton: document.getElementById("operator-login-button"),
+  operatorEmail: document.getElementById("operator-email"),
+  operatorClaimButton: document.getElementById("operator-claim-button"),
+  operatorRefreshButton: document.getElementById("operator-refresh-button"),
+  operatorSignoutButton: document.getElementById("operator-signout-button"),
+  operatorFeedback: document.getElementById("operator-feedback"),
+  operatorDrafts: document.getElementById("operator-drafts")
 };
 
 init();
@@ -41,16 +55,19 @@ async function init() {
 
   if (!state.configured) {
     renderDisconnectedState();
+    renderOperatorState();
     applyFilters();
     return;
   }
 
   state.supabase = window.supabase.createClient(config.SUPABASE_URL, publicKey);
+  setupAuthSubscription();
   setStatus("Loading live Milton Keynes data...");
 
   try {
     await Promise.all([loadCategories(), loadListings()]);
     hydrateFilters();
+    await refreshOperatorState();
     applyFilters();
     setStatus("Live data connected.", "ok");
     setupRealtime();
@@ -62,6 +79,7 @@ async function init() {
     } else {
       setStatus("Could not load data from Supabase.", "warn");
     }
+    await refreshOperatorState();
     applyFilters();
   }
 }
@@ -94,6 +112,7 @@ function wireEvents() {
   });
 
   els.openSubmitPanel.addEventListener("click", () => {
+    els.operatorPanel.hidden = true;
     toggleSubmitPanel(true);
   });
 
@@ -102,6 +121,27 @@ function wireEvents() {
   });
 
   els.submitForm.addEventListener("submit", handleSubmitListing);
+
+  els.openOperatorPanel.addEventListener("click", async () => {
+    toggleOperatorPanel();
+    if (!els.operatorPanel.hidden) {
+      await refreshOperatorState();
+    }
+  });
+
+  els.operatorLoginForm.addEventListener("submit", handleOperatorLogin);
+  els.operatorClaimButton.addEventListener("click", handleClaimOperator);
+  els.operatorRefreshButton.addEventListener("click", loadDraftSubmissions);
+  els.operatorSignoutButton.addEventListener("click", handleOperatorSignOut);
+
+  els.operatorDrafts.addEventListener("click", async (event) => {
+    const button = event.target.closest("button[data-action][data-id]");
+    if (!button) return;
+    const action = button.getAttribute("data-action");
+    const id = button.getAttribute("data-id");
+    if (!action || !id) return;
+    await handleReviewAction(id, action, button);
+  });
 }
 
 async function loadCategories() {
@@ -243,7 +283,7 @@ function renderResults(rows) {
     } else if (!state.listings.length) {
       empty.innerHTML = `
         <strong>No listings yet</strong>
-        <p>Publish real Milton Keynes records in Supabase.</p>
+        <p>Add a listing, then publish it in Review.</p>
       `;
     } else {
       empty.innerHTML = `
@@ -396,6 +436,335 @@ function setupRealtime() {
       }
     })
     .subscribe();
+}
+
+function setupAuthSubscription() {
+  if (!state.supabase?.auth) return;
+
+  state.supabase.auth.onAuthStateChange(async () => {
+    await refreshOperatorState();
+  });
+}
+
+async function refreshOperatorState() {
+  if (!state.supabase?.auth) {
+    state.authSession = null;
+    state.isOperator = false;
+    renderOperatorState();
+    return;
+  }
+
+  const { data, error } = await state.supabase.auth.getSession();
+  if (error) {
+    console.error(error);
+    setOperatorFeedback("Could not read sign-in session.", "warn");
+    state.authSession = null;
+    state.isOperator = false;
+    renderOperatorState();
+    return;
+  }
+
+  state.authSession = data?.session || null;
+  state.isOperator = await checkOperatorAccess();
+  renderOperatorState();
+
+  if (!els.operatorPanel.hidden && state.isOperator) {
+    await loadDraftSubmissions();
+  }
+}
+
+async function checkOperatorAccess() {
+  if (!state.authSession) return false;
+
+  const { data, error } = await state.supabase.rpc("is_operator");
+  if (!error) return Boolean(data);
+
+  console.error(error);
+  const message = String(error?.message || "");
+  if (message.includes("Could not find the function")) {
+    setOperatorFeedback("Run the latest supabase/schema.sql to enable review mode.", "warn");
+  } else {
+    setOperatorFeedback("Could not verify operator access.", "warn");
+  }
+  return false;
+}
+
+function renderOperatorState() {
+  const email = state.authSession?.user?.email || "";
+
+  if (!state.configured) {
+    els.operatorStatusText.textContent = "Connect Supabase first.";
+    els.operatorLoginForm.hidden = true;
+    els.operatorClaimButton.hidden = true;
+    els.operatorRefreshButton.hidden = true;
+    els.operatorSignoutButton.hidden = true;
+    els.operatorDrafts.innerHTML = "";
+    return;
+  }
+
+  if (!state.authSession) {
+    els.operatorStatusText.textContent = "Sign in to review draft listings.";
+    els.operatorLoginForm.hidden = false;
+    els.operatorClaimButton.hidden = true;
+    els.operatorRefreshButton.hidden = true;
+    els.operatorSignoutButton.hidden = true;
+    els.operatorDrafts.innerHTML = "";
+    return;
+  }
+
+  els.operatorLoginForm.hidden = true;
+  els.operatorSignoutButton.hidden = false;
+
+  if (state.isOperator) {
+    els.operatorStatusText.textContent = `Signed in as ${email}.`;
+    els.operatorClaimButton.hidden = true;
+    els.operatorRefreshButton.hidden = false;
+  } else {
+    els.operatorStatusText.textContent = `Signed in as ${email}. No operator access yet.`;
+    els.operatorClaimButton.hidden = false;
+    els.operatorRefreshButton.hidden = true;
+    els.operatorDrafts.innerHTML = "";
+  }
+}
+
+function toggleOperatorPanel() {
+  const open = els.operatorPanel.hidden;
+  els.operatorPanel.hidden = !open;
+  if (open) {
+    els.submitPanel.hidden = true;
+  }
+}
+
+async function handleOperatorLogin(event) {
+  event.preventDefault();
+  if (!state.configured || !state.supabase) {
+    setOperatorFeedback("Connect Supabase first.", "warn");
+    return;
+  }
+
+  const email = normalizeInput(els.operatorEmail.value);
+  if (!email) {
+    setOperatorFeedback("Enter your operator email.", "warn");
+    return;
+  }
+
+  els.operatorLoginButton.disabled = true;
+  els.operatorLoginButton.textContent = "Sending...";
+  setOperatorFeedback("Sending sign-in link...", "neutral");
+
+  const redirectTo = window.location.href.split("#")[0];
+  const { error } = await state.supabase.auth.signInWithOtp({
+    email,
+    options: { emailRedirectTo: redirectTo }
+  });
+
+  els.operatorLoginButton.disabled = false;
+  els.operatorLoginButton.textContent = "Send sign-in link";
+
+  if (error) {
+    console.error(error);
+    setOperatorFeedback("Could not send sign-in link.", "warn");
+    return;
+  }
+
+  setOperatorFeedback("Check your email and open the sign-in link.", "ok");
+}
+
+async function handleClaimOperator() {
+  if (!state.authSession || !state.supabase) {
+    setOperatorFeedback("Sign in first.", "warn");
+    return;
+  }
+
+  const email = state.authSession.user?.email?.toLowerCase();
+  if (!email) {
+    setOperatorFeedback("No email found in current session.", "warn");
+    return;
+  }
+
+  els.operatorClaimButton.disabled = true;
+  setOperatorFeedback("Claiming operator access...", "neutral");
+
+  const { error } = await state.supabase.from("operator_emails").insert({ email, is_active: true });
+  els.operatorClaimButton.disabled = false;
+
+  if (error) {
+    console.error(error);
+    const message = String(error?.message || "").toLowerCase();
+    if (message.includes("duplicate key")) {
+      setOperatorFeedback("Operator access already exists for this email.", "ok");
+      await refreshOperatorState();
+      return;
+    }
+    if (message.includes("row-level security")) {
+      setOperatorFeedback("Operator access already claimed. Ask an operator to add your email.", "warn");
+      return;
+    }
+    setOperatorFeedback("Could not claim operator access. Run latest schema SQL.", "warn");
+    return;
+  }
+
+  setOperatorFeedback("Operator access granted.", "ok");
+  await refreshOperatorState();
+}
+
+async function handleOperatorSignOut() {
+  if (!state.supabase?.auth) return;
+
+  const { error } = await state.supabase.auth.signOut();
+  if (error) {
+    console.error(error);
+    setOperatorFeedback("Could not sign out.", "warn");
+    return;
+  }
+
+  state.authSession = null;
+  state.isOperator = false;
+  els.operatorDrafts.innerHTML = "";
+  setOperatorFeedback("Signed out.", "neutral");
+  renderOperatorState();
+}
+
+async function loadDraftSubmissions() {
+  if (!state.supabase || !state.isOperator) return;
+
+  state.reviewing = true;
+  els.operatorRefreshButton.disabled = true;
+  setOperatorFeedback("Loading drafts...", "neutral");
+
+  const { data, error } = await state.supabase
+    .from("search_documents")
+    .select(`
+      id,
+      title,
+      category_slug,
+      short_description,
+      website_url,
+      booking_url,
+      address_text,
+      starts_at,
+      source_name,
+      source_url,
+      created_at,
+      status
+    `)
+    .eq("status", "draft")
+    .order("created_at", { ascending: false })
+    .limit(200);
+
+  state.reviewing = false;
+  els.operatorRefreshButton.disabled = false;
+
+  if (error) {
+    console.error(error);
+    setOperatorFeedback("Could not load drafts.", "warn");
+    return;
+  }
+
+  renderDraftSubmissions(data || []);
+  setOperatorFeedback(`${(data || []).length} draft${(data || []).length === 1 ? "" : "s"} loaded.`, "ok");
+}
+
+function renderDraftSubmissions(rows) {
+  els.operatorDrafts.innerHTML = "";
+
+  if (!rows.length) {
+    const empty = document.createElement("article");
+    empty.className = "empty-state";
+    empty.innerHTML = `
+      <strong>No drafts</strong>
+      <p>New submissions will appear here.</p>
+    `;
+    els.operatorDrafts.appendChild(empty);
+    return;
+  }
+
+  for (const row of rows) {
+    const card = document.createElement("article");
+    card.className = "review-card";
+
+    const title = document.createElement("h3");
+    title.textContent = row.title || "Untitled";
+    card.appendChild(title);
+
+    const description = document.createElement("p");
+    description.textContent = row.short_description || "No description.";
+    card.appendChild(description);
+
+    const meta = document.createElement("div");
+    meta.className = "review-card__meta";
+    appendMeta(meta, humaniseSlug(row.category_slug || "listing"));
+    if (row.address_text) appendMeta(meta, row.address_text);
+    if (row.starts_at) appendMeta(meta, `Starts ${formatDateTime(row.starts_at)}`);
+    if (row.created_at) appendMeta(meta, `Submitted ${formatDateTime(row.created_at)}`);
+    card.appendChild(meta);
+
+    const actions = document.createElement("div");
+    actions.className = "review-card__actions";
+
+    const publishButton = document.createElement("button");
+    publishButton.type = "button";
+    publishButton.setAttribute("data-action", "publish");
+    publishButton.setAttribute("data-id", row.id);
+    publishButton.textContent = "Publish";
+    actions.appendChild(publishButton);
+
+    const archiveButton = document.createElement("button");
+    archiveButton.type = "button";
+    archiveButton.setAttribute("data-action", "archive");
+    archiveButton.setAttribute("data-id", row.id);
+    archiveButton.textContent = "Archive";
+    actions.appendChild(archiveButton);
+
+    card.appendChild(actions);
+    els.operatorDrafts.appendChild(card);
+  }
+}
+
+async function handleReviewAction(id, action, button) {
+  if (!state.supabase || !state.isOperator) return;
+  if (!["publish", "archive"].includes(action)) return;
+
+  button.disabled = true;
+  setOperatorFeedback(action === "publish" ? "Publishing..." : "Archiving...", "neutral");
+
+  const update = action === "publish"
+    ? { status: "published", verified_at: new Date().toISOString() }
+    : { status: "archived" };
+
+  const { error } = await state.supabase
+    .from("search_documents")
+    .update(update)
+    .eq("id", id)
+    .eq("status", "draft");
+
+  button.disabled = false;
+
+  if (error) {
+    console.error(error);
+    setOperatorFeedback("Could not save review action.", "warn");
+    return;
+  }
+
+  setOperatorFeedback(action === "publish" ? "Published." : "Archived.", "ok");
+  try {
+    await Promise.all([loadDraftSubmissions(), loadListings()]);
+    applyFilters();
+  } catch (refreshError) {
+    console.error(refreshError);
+    setOperatorFeedback("Saved, but refresh failed. Reload page.", "warn");
+  }
+}
+
+function setOperatorFeedback(message, tone) {
+  els.operatorFeedback.textContent = message;
+
+  if (tone === "neutral") {
+    els.operatorFeedback.removeAttribute("data-tone");
+    return;
+  }
+
+  els.operatorFeedback.setAttribute("data-tone", tone);
 }
 
 function toggleSubmitPanel(open) {
