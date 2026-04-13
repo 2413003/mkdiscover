@@ -2,6 +2,8 @@ const config = window.MK_DISCOVER_CONFIG || {};
 const CACHE_KEY = "mk_discover_cache_v1";
 const CACHE_MAX_AGE_MS = 1000 * 60 * 15;
 const INITIAL_LOAD_TIMEOUT_MS = 900;
+const LISTING_IMAGE_BUCKET = "listing-images";
+const MAX_IMAGE_SIZE_BYTES = 5 * 1024 * 1024;
 const DEFAULT_CATEGORIES = [
   { slug: "events", name: "Events" },
   { slug: "food-and-drink", name: "Food & Drink" },
@@ -32,7 +34,8 @@ const state = {
   isOperator: false,
   authSession: null,
   reviewing: false,
-  moderationRows: []
+  moderationRows: [],
+  previewObjectUrl: null
 };
 
 const els = {
@@ -52,6 +55,9 @@ const els = {
   submitButton: document.getElementById("submit-button"),
   submitCategory: document.getElementById("submit-category"),
   submitFeedback: document.getElementById("submit-feedback"),
+  submitImageFile: document.getElementById("submit-image-file"),
+  submitImagePreviewWrap: document.getElementById("submit-image-preview-wrap"),
+  submitImagePreview: document.getElementById("submit-image-preview"),
   openOperatorPanel: document.getElementById("open-operator-panel"),
   operatorPanel: document.getElementById("operator-panel"),
   operatorStatusText: document.getElementById("operator-status-text"),
@@ -194,6 +200,7 @@ function wireEvents() {
   });
 
   els.submitForm.addEventListener("submit", handleSubmitListing);
+  els.submitImageFile.addEventListener("change", handleImageFileChange);
 
   els.openOperatorPanel.addEventListener("click", async () => {
     toggleOperatorPanel();
@@ -238,6 +245,7 @@ async function loadListings() {
       category_slug,
       short_description,
       long_description,
+      image_url,
       website_url,
       booking_url,
       address_text,
@@ -429,6 +437,7 @@ function renderResults(rows) {
 
   for (const row of rows) {
     const fragment = els.cardTemplate.content.cloneNode(true);
+    const imageEl = fragment.querySelector(".result-card__image");
     const categoryEl = fragment.querySelector(".result-card__category");
     const stateEl = fragment.querySelector(".result-card__state");
     const titleEl = fragment.querySelector(".result-card__title");
@@ -437,6 +446,13 @@ function renderResults(rows) {
     const actionEl = fragment.querySelector(".result-card__action");
 
     categoryEl.textContent = humaniseSlug(row.category_slug || "listing");
+
+    if (row.image_url) {
+      imageEl.src = row.image_url;
+      imageEl.alt = row.title ? `${row.title} image` : "Listing image";
+    } else {
+      imageEl.remove();
+    }
 
     if (row.is_active_now) {
       stateEl.textContent = "Open now";
@@ -1033,6 +1049,7 @@ function toggleSubmitPanel(open) {
   if (open) {
     els.submitForm.querySelector("#submit-title")?.focus();
   } else {
+    clearImagePreview();
     setSubmitFeedback("", "neutral");
   }
 }
@@ -1057,6 +1074,7 @@ async function handleSubmitListing(event) {
   const tagsRaw = normalizeInput(formData.get("tags"));
   const sourceUrl = normalizeInput(formData.get("source_url"));
   const submitterName = normalizeInput(formData.get("name"));
+  const imageFile = els.submitImageFile.files?.[0] || null;
 
   if (!title || !categorySlug || !description) {
     setSubmitFeedback("Add title, category, and description.", "warn");
@@ -1073,16 +1091,38 @@ async function handleSubmitListing(event) {
     startsAt = parsed.toISOString();
   }
 
+  if (imageFile) {
+    const imageError = validateImageFile(imageFile);
+    if (imageError) {
+      setSubmitFeedback(imageError, "warn");
+      return;
+    }
+  }
+
   state.submitting = true;
   els.submitButton.disabled = true;
   els.submitButton.textContent = "Submitting...";
   setSubmitFeedback("Publishing...", "neutral");
+
+  let imageUrl = null;
+  if (imageFile) {
+    setSubmitFeedback("Uploading image...", "neutral");
+    imageUrl = await uploadListingImage(imageFile, title);
+    if (!imageUrl) {
+      state.submitting = false;
+      els.submitButton.disabled = false;
+      els.submitButton.textContent = "Submit";
+      return;
+    }
+    setSubmitFeedback("Publishing...", "neutral");
+  }
 
   const payload = {
     slug: makeSubmissionSlug(title),
     title,
     category_slug: categorySlug,
     short_description: description,
+    image_url: imageUrl,
     website_url: emptyToNull(websiteUrl),
     booking_url: emptyToNull(bookingUrl),
     address_text: emptyToNull(location),
@@ -1123,6 +1163,7 @@ async function handleSubmitListing(event) {
   }
 
   els.submitForm.reset();
+  clearImagePreview();
   setSubmitFeedback("Posted.", "ok");
 
   try {
@@ -1156,6 +1197,103 @@ function parseTags(raw) {
     .filter(Boolean);
 
   return [...new Set(parts)].slice(0, 8);
+}
+
+function handleImageFileChange() {
+  const file = els.submitImageFile.files?.[0] || null;
+  if (!file) {
+    clearImagePreview();
+    return;
+  }
+
+  const imageError = validateImageFile(file);
+  if (imageError) {
+    setSubmitFeedback(imageError, "warn");
+    els.submitImageFile.value = "";
+    clearImagePreview();
+    return;
+  }
+
+  setSubmitFeedback("", "neutral");
+  setImagePreview(file);
+}
+
+function validateImageFile(file) {
+  if (!file.type || !file.type.startsWith("image/")) {
+    return "Please select an image file.";
+  }
+
+  if (file.size > MAX_IMAGE_SIZE_BYTES) {
+    return "Image must be 5MB or smaller.";
+  }
+
+  return null;
+}
+
+function setImagePreview(file) {
+  clearImagePreview(false);
+  state.previewObjectUrl = URL.createObjectURL(file);
+  els.submitImagePreview.src = state.previewObjectUrl;
+  els.submitImagePreviewWrap.hidden = false;
+}
+
+function clearImagePreview(clearInput = true) {
+  if (state.previewObjectUrl) {
+    URL.revokeObjectURL(state.previewObjectUrl);
+    state.previewObjectUrl = null;
+  }
+
+  els.submitImagePreview.removeAttribute("src");
+  els.submitImagePreviewWrap.hidden = true;
+
+  if (clearInput) {
+    els.submitImageFile.value = "";
+  }
+}
+
+async function uploadListingImage(file, title) {
+  if (!state.supabasePublic) return null;
+
+  const extension = inferImageExtension(file);
+  const path = `public/${new Date().toISOString().slice(0, 10)}/${makeSubmissionSlug(title)}.${extension}`;
+
+  const { error } = await state.supabasePublic.storage
+    .from(LISTING_IMAGE_BUCKET)
+    .upload(path, file, {
+      cacheControl: "3600",
+      upsert: false,
+      contentType: file.type || "image/jpeg"
+    });
+
+  if (error) {
+    console.error(error);
+    setSubmitFeedback(`Image upload failed: ${getErrorMessage(error)}`, "warn");
+    return null;
+  }
+
+  const { data } = state.supabasePublic.storage.from(LISTING_IMAGE_BUCKET).getPublicUrl(path);
+  const publicUrl = data?.publicUrl || null;
+
+  if (!publicUrl) {
+    setSubmitFeedback("Image uploaded but URL is missing.", "warn");
+    return null;
+  }
+
+  return publicUrl;
+}
+
+function inferImageExtension(file) {
+  const fileName = String(file?.name || "");
+  const dotIndex = fileName.lastIndexOf(".");
+  if (dotIndex !== -1 && dotIndex < fileName.length - 1) {
+    return fileName.slice(dotIndex + 1).toLowerCase();
+  }
+
+  const mime = String(file?.type || "").toLowerCase();
+  if (mime.includes("png")) return "png";
+  if (mime.includes("webp")) return "webp";
+  if (mime.includes("gif")) return "gif";
+  return "jpg";
 }
 
 function normalizeInput(value) {

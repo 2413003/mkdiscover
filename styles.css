@@ -267,6 +267,22 @@ h1 {
   grid-column: 1 / -1;
 }
 
+.submit-image-preview-wrap {
+  grid-column: 1 / -1;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 8px;
+  background: var(--surface-soft);
+}
+
+.submit-image-preview {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  object-fit: cover;
+  border-radius: 10px;
+}
+
 .submit-actions {
   grid-column: 1 / -1;
   display: flex;
@@ -479,6 +495,14 @@ h1 {
   display: flex;
   flex-direction: column;
   gap: 10px;
+}
+
+.result-card__image {
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  object-fit: cover;
+  border-radius: 12px;
+  border: 1px solid var(--border);
 }
 
 .result-card__top {

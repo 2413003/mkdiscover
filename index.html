@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="styles.css?v=20260413n" />
 </head>
 <body>
   <main class="app">
@@ -96,6 +96,15 @@
           <input id="submit-location" name="location" type="text" maxlength="180" placeholder="Area, venue, or postcode" />
         </label>
 
+        <label class="submit-field" for="submit-image-file">
+          <span>Image</span>
+          <input id="submit-image-file" name="image_file" type="file" accept="image/*" />
+        </label>
+
+        <div id="submit-image-preview-wrap" class="submit-image-preview-wrap" hidden>
+          <img id="submit-image-preview" class="submit-image-preview" alt="Listing image preview" />
+        </div>
+
         <label class="submit-field" for="submit-starts-at">
           <span>Starts (optional)</span>
           <input id="submit-starts-at" name="starts_at" type="datetime-local" />
@@ -159,6 +168,7 @@
 
   <template id="result-card-template">
     <article class="result-card">
+      <img class="result-card__image" alt="" loading="lazy" />
       <div class="result-card__top">
         <span class="result-card__category"></span>
         <span class="result-card__state"></span>
@@ -171,7 +181,7 @@
   </template>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="config.js?v=20260413l"></script>
-  <script src="app.js?v=20260413l"></script>
+  <script src="config.js?v=20260413n"></script>
+  <script src="app.js?v=20260413n"></script>
 </body>
 </html>
