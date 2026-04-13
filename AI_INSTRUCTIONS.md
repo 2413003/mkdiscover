@@ -1,4 +1,4 @@
-# Permanent AI project instructions
+# Permanent AI Project Instructions
 
 You are working on **MK Discover**, a Milton Keynes discovery platform.
 
@@ -38,12 +38,25 @@ Every change should push the product toward being:
 
 1. **Production must not use fake or demo listings.**
 2. Do not invent factual business data.
-3. Keep the interface extremely simple.
+3. **All user-facing pages must follow `DESIGN_SYSTEM.md` with Apple/Google-level simplicity.**
 4. Prefer speed, clarity, and usefulness over complexity.
 5. Ranking should reward relevance, trust, freshness, and current availability.
 6. Every important data model should support future verification and source tracking.
 7. Design for GitHub Pages + Supabase unless intentionally migrating architecture.
 8. Keep Milton Keynes local-first. Do not dilute with broad UK data unless intentionally expanding.
+
+## Page styling law (hard requirement)
+
+For all user-facing screens:
+
+- one primary action per screen
+- minimal text only
+- visual hierarchy over explanation
+- instantly understandable in 1-2 seconds
+- consistent layout and control patterns across pages
+- mobile-first clarity
+
+If a page fails these conditions, redesign it before shipping.
 
 ## Product principles
 
@@ -62,6 +75,7 @@ Every change should push the product toward being:
 - black/white/light neutral palette by default
 - strong hierarchy
 - large search input
+- obvious next action
 - almost Apple/Google-level simplicity
 
 ## Data priorities

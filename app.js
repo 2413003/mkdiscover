@@ -1,14 +1,15 @@
 const config = window.MK_DISCOVER_CONFIG || {};
+
 const state = {
   supabase: null,
+  configured: false,
   categories: [],
   listings: [],
   filtered: [],
   query: "",
   category: "",
   sort: "relevance",
-  openNow: false,
-  configured: false
+  openNow: false
 };
 
 const els = {
@@ -17,10 +18,9 @@ const els = {
   category: document.getElementById("category-filter"),
   sort: document.getElementById("sort-filter"),
   openNow: document.getElementById("open-now-filter"),
-  resultsGrid: document.getElementById("results-grid"),
+  statusLine: document.getElementById("status-line"),
   resultsSummary: document.getElementById("results-summary"),
-  statsBar: document.getElementById("stats-bar"),
-  statusCard: document.getElementById("status-card"),
+  resultsGrid: document.getElementById("results-grid"),
   cardTemplate: document.getElementById("result-card-template")
 };
 
@@ -32,23 +32,23 @@ async function init() {
 
   if (!state.configured) {
     renderDisconnectedState();
-    renderResults([]);
+    applyFilters();
     return;
   }
 
   state.supabase = window.supabase.createClient(config.SUPABASE_URL, config.SUPABASE_ANON_KEY);
-  setStatus("Loading real Milton Keynes data from Supabase...");
+  setStatus("Loading live Milton Keynes data...");
 
   try {
     await Promise.all([loadCategories(), loadListings()]);
     hydrateFilters();
     applyFilters();
-    setStatus("Connected to Supabase. Showing live database records only.");
+    setStatus("Live data connected.", "ok");
     setupRealtime();
   } catch (error) {
     console.error(error);
-    setStatus(`Could not load data: ${error.message}`);
-    renderResults([]);
+    setStatus("Could not load data from Supabase.", "warn");
+    applyFilters();
   }
 }
 
@@ -110,8 +110,7 @@ async function loadListings() {
       starts_at,
       ends_at,
       updated_at,
-      quality_score,
-      source_name
+      quality_score
     `)
     .eq("status", "published")
     .order("quality_score", { ascending: false })
@@ -123,7 +122,8 @@ async function loadListings() {
 }
 
 function hydrateFilters() {
-  els.category.innerHTML = '<option value="">All</option>';
+  els.category.innerHTML = '<option value="">All categories</option>';
+
   for (const category of state.categories) {
     const option = document.createElement("option");
     option.value = category.slug;
@@ -133,12 +133,11 @@ function hydrateFilters() {
 }
 
 function applyFilters() {
-  const query = state.query.toLowerCase();
+  const query = normalize(state.query);
 
   let rows = [...state.listings].filter((row) => {
     if (state.category && row.category_slug !== state.category) return false;
     if (state.openNow && !row.is_active_now) return false;
-
     if (!query) return true;
 
     const haystack = [
@@ -148,7 +147,7 @@ function applyFilters() {
       row.category_slug,
       row.address_text,
       row.postcode,
-      ...(row.tags || [])
+      ...normaliseTags(row.tags)
     ]
       .filter(Boolean)
       .join(" ")
@@ -160,7 +159,7 @@ function applyFilters() {
   rows = rows.map((row) => ({ ...row, _score: computeScore(row, query) }));
 
   if (state.sort === "name") {
-    rows.sort((a, b) => a.title.localeCompare(b.title, "en-GB"));
+    rows.sort((a, b) => (a.title || "").localeCompare(b.title || "", "en-GB"));
   } else if (state.sort === "newest") {
     rows.sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at));
   } else {
@@ -168,123 +167,188 @@ function applyFilters() {
   }
 
   state.filtered = rows;
-  renderStats(rows);
+  renderSummary();
   renderResults(rows);
 }
 
-function computeScore(row, query) {
-  let score = Number(row.quality_score || 0);
-  if (!query) return score;
+function renderSummary() {
+  if (!state.configured) {
+    els.resultsSummary.textContent = "No live connection.";
+    return;
+  }
 
-  if (row.title?.toLowerCase().includes(query)) score += 50;
-  if (row.short_description?.toLowerCase().includes(query)) score += 20;
-  if ((row.tags || []).some((tag) => tag.toLowerCase().includes(query))) score += 18;
-  if (row.category_slug?.toLowerCase().includes(query)) score += 10;
-  if (row.is_active_now) score += 5;
-  return score;
-}
+  if (!state.listings.length) {
+    els.resultsSummary.textContent = "No listings yet.";
+    return;
+  }
 
-function renderStats(rows) {
-  const activeNow = rows.filter((row) => row.is_active_now).length;
-  const categories = new Set(rows.map((row) => row.category_slug).filter(Boolean)).size;
-  const updated = rows[0]?.updated_at ? formatDateTime(rows[0].updated_at) : "—";
+  if (!state.filtered.length) {
+    els.resultsSummary.textContent = "No matches.";
+    return;
+  }
 
-  els.statsBar.innerHTML = `
-    <strong>${rows.length}</strong> results ·
-    <strong>${activeNow}</strong> active now ·
-    <strong>${categories}</strong> categories ·
-    latest update <strong>${updated}</strong>
-  `;
+  const total = state.filtered.length;
+  const activeNow = state.filtered.filter((row) => row.is_active_now).length;
+  let text = `${total} result${total === 1 ? "" : "s"}`;
 
-  els.resultsSummary.textContent = rows.length
-    ? `Showing ${rows.length} real records from the database.`
-    : "No matching real records found.";
+  if (activeNow) {
+    text += ` | ${activeNow} open now`;
+  }
+
+  els.resultsSummary.textContent = text;
 }
 
 function renderResults(rows) {
   els.resultsGrid.innerHTML = "";
 
   if (!rows.length) {
-    const empty = document.createElement("div");
+    const empty = document.createElement("article");
     empty.className = "empty-state";
-    empty.innerHTML = `
-      <strong>No results found.</strong>
-      <p>Try a broader search, remove filters, or add more real Milton Keynes listings to Supabase.</p>
-    `;
+
+    if (!state.configured) {
+      empty.innerHTML = `
+        <strong>Connect Supabase</strong>
+        <p>Add your Supabase URL and anon key in config.js.</p>
+      `;
+    } else if (!state.listings.length) {
+      empty.innerHTML = `
+        <strong>No listings yet</strong>
+        <p>Publish real Milton Keynes records in Supabase.</p>
+      `;
+    } else {
+      empty.innerHTML = `
+        <strong>No matches</strong>
+        <p>Try a broader search or fewer filters.</p>
+      `;
+    }
+
     els.resultsGrid.appendChild(empty);
     return;
   }
 
   for (const row of rows) {
     const fragment = els.cardTemplate.content.cloneNode(true);
-    fragment.querySelector(".card__eyebrow").textContent = humaniseSlug(row.category_slug || "listing");
-    fragment.querySelector(".card__title").textContent = row.title || "Untitled";
-    fragment.querySelector(".card__score").innerHTML = `<span class="score-pill">Score ${Math.round(row._score || row.quality_score || 0)}</span>`;
-    fragment.querySelector(".card__description").textContent = row.short_description || row.long_description || "No description yet.";
+    const categoryEl = fragment.querySelector(".result-card__category");
+    const stateEl = fragment.querySelector(".result-card__state");
+    const titleEl = fragment.querySelector(".result-card__title");
+    const descriptionEl = fragment.querySelector(".result-card__description");
+    const metaEl = fragment.querySelector(".result-card__meta");
+    const actionEl = fragment.querySelector(".result-card__action");
 
-    const meta = fragment.querySelector(".card__meta");
-    const tags = fragment.querySelector(".card__tags");
-    const actions = fragment.querySelector(".card__actions");
+    categoryEl.textContent = humaniseSlug(row.category_slug || "listing");
 
-    appendPill(meta, row.address_text || row.postcode || "Milton Keynes");
-    if (row.is_active_now) appendPill(meta, "Active now");
-    if (row.starts_at) appendPill(meta, `Starts ${formatDateTime(row.starts_at)}`);
-    if (row.source_name) appendPill(meta, `Source: ${row.source_name}`);
+    if (row.is_active_now) {
+      stateEl.textContent = "Open now";
+      stateEl.classList.add("is-active");
+    } else {
+      stateEl.remove();
+    }
 
-    for (const tag of row.tags || []) appendTag(tags, tag);
+    titleEl.textContent = row.title || "Untitled";
 
-    if (row.website_url) actions.appendChild(makeAction("Website", row.website_url, true));
-    if (row.booking_url) actions.appendChild(makeAction("Book / View", row.booking_url, false));
+    const description = row.short_description || row.long_description || "";
+    if (description) {
+      descriptionEl.textContent = description;
+    } else {
+      descriptionEl.remove();
+    }
+
+    const location = row.address_text || row.postcode;
+    if (row.starts_at) appendMeta(metaEl, `Starts ${formatDateTime(row.starts_at)}`);
+    if (location) appendMeta(metaEl, location);
+
+    if (!metaEl.childElementCount) {
+      metaEl.remove();
+    }
+
+    const actionUrl = row.booking_url || row.website_url;
+    if (actionUrl) {
+      actionEl.appendChild(makeAction("View", actionUrl));
+    } else {
+      actionEl.remove();
+    }
 
     els.resultsGrid.appendChild(fragment);
   }
 }
 
-function appendPill(parent, text) {
-  const pill = document.createElement("span");
-  pill.className = "pill";
-  pill.textContent = text;
-  parent.appendChild(pill);
+function appendMeta(parent, text) {
+  const item = document.createElement("span");
+  item.className = "meta-pill";
+  item.textContent = text;
+  parent.appendChild(item);
 }
 
-function appendTag(parent, text) {
-  const tag = document.createElement("span");
-  tag.className = "tag";
-  tag.textContent = text;
-  parent.appendChild(tag);
-}
-
-function makeAction(label, href, primary) {
+function makeAction(label, href) {
   const link = document.createElement("a");
   link.href = href;
   link.target = "_blank";
   link.rel = "noreferrer";
   link.textContent = label;
-  if (primary) link.classList.add("primary");
   return link;
 }
 
+function computeScore(row, query) {
+  let score = Number(row.quality_score || 0);
+  if (!query) return score;
+
+  const title = normalize(row.title);
+  const shortDescription = normalize(row.short_description);
+  const longDescription = normalize(row.long_description);
+  const category = normalize(row.category_slug);
+  const address = normalize(row.address_text);
+  const tags = normaliseTags(row.tags).map(normalize);
+
+  if (title.includes(query)) score += 60;
+  if (shortDescription.includes(query)) score += 24;
+  if (longDescription.includes(query)) score += 16;
+  if (category.includes(query)) score += 12;
+  if (address.includes(query)) score += 10;
+  if (tags.some((tag) => tag.includes(query))) score += 12;
+  if (row.is_active_now) score += 5;
+
+  return score;
+}
+
+function normaliseTags(tags) {
+  if (Array.isArray(tags)) return tags;
+  if (typeof tags === "string" && tags.trim()) return [tags];
+  return [];
+}
+
+function normalize(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
 function humaniseSlug(slug) {
-  return slug.replace(/[-_]/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
+  return slug.replace(/[-_]/g, " ").replace(/\b\w/g, (character) => character.toUpperCase());
 }
 
 function formatDateTime(value) {
   try {
     return new Intl.DateTimeFormat("en-GB", {
-      dateStyle: "medium",
-      timeStyle: "short"
+      day: "numeric",
+      month: "short",
+      hour: "2-digit",
+      minute: "2-digit"
     }).format(new Date(value));
   } catch {
     return value;
   }
 }
 
-function setStatus(message) {
-  els.statusCard.innerHTML = `<h2>Status</h2><p>${message}</p>`;
+function setStatus(message, tone = "neutral") {
+  els.statusLine.textContent = message;
+
+  if (tone === "neutral") {
+    els.statusLine.removeAttribute("data-tone");
+  } else {
+    els.statusLine.setAttribute("data-tone", tone);
+  }
 }
 
 function renderDisconnectedState() {
-  els.statsBar.innerHTML = "No Supabase connection yet · real records only · no bundled demo data";
+  setStatus("Set Supabase keys in config.js to load real data.", "warn");
 }
 
 function setupRealtime() {
@@ -292,13 +356,14 @@ function setupRealtime() {
 
   state.supabase
     .channel("search_documents_changes")
-    .on(
-      "postgres_changes",
-      { event: "*", schema: "public", table: "search_documents" },
-      async () => {
+    .on("postgres_changes", { event: "*", schema: "public", table: "search_documents" }, async () => {
+      try {
         await loadListings();
         applyFilters();
+      } catch (error) {
+        console.error(error);
+        setStatus("Live update failed. Refresh to retry.", "warn");
       }
-    )
+    })
     .subscribe();
 }
