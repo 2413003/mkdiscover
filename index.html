@@ -11,7 +11,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="styles.css?v=20260413y" />
+  <link rel="stylesheet" href="styles.css?v=20260413ab" />
 </head>
 <body>
   <main class="app">
@@ -62,33 +62,40 @@
         <button type="submit">Find plan</button>
       </form>
 
-      <div class="refine-row" aria-label="Refine search results">
-        <label class="field field-select" for="category-filter">
-          <span class="field-label">Category</span>
-          <select id="category-filter">
-            <option value="">All categories</option>
-          </select>
-        </label>
+      <div id="refine-row" class="refine-row" aria-label="Refine search results">
+        <button id="filters-toggle" class="ghost-button filters-toggle" type="button" aria-expanded="false" aria-controls="filters-menu" hidden>Filters</button>
 
-        <label class="field field-select" for="sort-filter">
-          <span class="field-label">Sort</span>
-          <select id="sort-filter">
-            <option value="relevance">Relevance</option>
-            <option value="newest">Newest</option>
-            <option value="popular">Most popular</option>
-            <option value="nearby">Nearby</option>
-            <option value="name">Name</option>
-          </select>
-        </label>
+        <div id="filters-menu" class="filters-menu">
+          <label class="field field-select" for="category-filter">
+            <span class="field-label">Category</span>
+            <select id="category-filter">
+              <option value="">All categories</option>
+            </select>
+          </label>
 
-        <label class="field field-toggle" for="open-now-filter">
-          <input id="open-now-filter" type="checkbox" />
-          <span>Open now</span>
-        </label>
+          <label class="field field-select" for="sort-filter">
+            <span class="field-label">Sort</span>
+            <select id="sort-filter">
+              <option value="relevance">Relevance</option>
+              <option value="newest">Newest</option>
+              <option value="popular">Most popular</option>
+              <option value="nearby">Nearby</option>
+              <option value="name">Name</option>
+            </select>
+          </label>
 
-        <button id="use-location-button" class="ghost-button" type="button">Near me</button>
-        <button id="open-submit-panel" class="ghost-button" type="button">Add listing</button>
-        <button id="open-operator-panel" class="ghost-button" type="button">Moderate</button>
+          <label class="field field-toggle" for="open-now-filter">
+            <input id="open-now-filter" type="checkbox" />
+            <span>Open now</span>
+          </label>
+
+          <button id="use-location-button" class="ghost-button" type="button">Near me</button>
+        </div>
+
+        <div class="refine-actions">
+          <button id="open-submit-panel" class="ghost-button" type="button">Add listing</button>
+          <button id="open-operator-panel" class="ghost-button" type="button">Moderate</button>
+        </div>
       </div>
     </header>
 
@@ -232,6 +239,6 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" defer></script>
   <script src="config.js?v=20260413o"></script>
-  <script src="app.js?v=20260413w"></script>
+  <script src="app.js?v=20260413ab"></script>
 </body>
 </html>

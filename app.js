@@ -11,6 +11,9 @@ const MK_VIEW_BOUNDS = [
   [MK_LAT_RANGE.min, MK_LNG_RANGE.min],
   [MK_LAT_RANGE.max, MK_LNG_RANGE.max]
 ];
+const CARD_PLACEHOLDER_IMAGE = `data:image/svg+xml,${encodeURIComponent(
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#edf1f4"/><stop offset="100%" stop-color="#dfe6eb"/></linearGradient></defs><rect width="1000" height="1000" fill="url(#g)"/><circle cx="300" cy="320" r="120" fill="#c8d2db"/><path d="M120 760l220-220 140 140 120-120 280 280H120z" fill="#bac6d0"/><text x="500" y="885" text-anchor="middle" fill="#6a7785" font-family="Arial,sans-serif" font-size="64" font-weight="700">MK</text></svg>'
+)}`;
 const LEAFLET_CSS_URL = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
 const LEAFLET_JS_URL = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
 const DEFAULT_CATEGORIES = [
@@ -66,6 +69,8 @@ const state = {
   openNow: false,
   planWhen: "any",
   planWho: "any",
+  hasSearched: false,
+  filtersMenuOpen: false,
   submitting: false,
   isOperator: false,
   authSession: null,
@@ -83,6 +88,9 @@ const state = {
 const els = {
   modeDiscover: document.getElementById("mode-discover"),
   modePlan: document.getElementById("mode-plan"),
+  refineRow: document.getElementById("refine-row"),
+  filtersToggle: document.getElementById("filters-toggle"),
+  filtersMenu: document.getElementById("filters-menu"),
   form: document.getElementById("search-form"),
   planForm: document.getElementById("plan-form"),
   planWhen: document.getElementById("plan-when"),
@@ -131,6 +139,7 @@ init();
 async function init() {
   wireEvents();
   setSearchMode(state.mode);
+  syncRefineControls();
   setNearbyButtonState();
   const publicKey = config.SUPABASE_PUBLISHABLE_KEY || config.SUPABASE_ANON_KEY;
   state.configured = Boolean(config.SUPABASE_URL && publicKey);
@@ -231,6 +240,7 @@ function wireEvents() {
   els.form.addEventListener("submit", (event) => {
     event.preventDefault();
     state.query = els.input.value.trim();
+    setHasSearched(true);
     applyFilters();
   });
 
@@ -245,6 +255,7 @@ function wireEvents() {
     event.preventDefault();
     state.planWhen = els.planWhen?.value || "any";
     state.planWho = els.planWho?.value || "any";
+    setHasSearched(true);
     applyFilters();
   });
 
@@ -278,6 +289,23 @@ function wireEvents() {
   });
 
   els.useLocationButton.addEventListener("click", handleUseLocation);
+
+  els.filtersToggle?.addEventListener("click", (event) => {
+    event.preventDefault();
+    setFiltersMenuOpen(!state.filtersMenuOpen);
+  });
+
+  document.addEventListener("click", (event) => {
+    if (!state.hasSearched || !state.filtersMenuOpen || !els.refineRow) return;
+    if (!(event.target instanceof Node)) return;
+    if (els.refineRow.contains(event.target)) return;
+    setFiltersMenuOpen(false);
+  });
+
+  document.addEventListener("keydown", (event) => {
+    if (event.key !== "Escape" || !state.filtersMenuOpen) return;
+    setFiltersMenuOpen(false);
+  });
 
   els.openSubmitPanel.addEventListener("click", () => {
     els.operatorPanel.hidden = true;
@@ -330,6 +358,33 @@ function setSearchMode(mode) {
   els.modePlan?.classList.toggle("is-active", isPlan);
   els.modeDiscover?.setAttribute("aria-selected", String(!isPlan));
   els.modePlan?.setAttribute("aria-selected", String(isPlan));
+  setFiltersMenuOpen(false);
+}
+
+function setHasSearched(hasSearched) {
+  state.hasSearched = Boolean(hasSearched);
+  if (!state.hasSearched) {
+    state.filtersMenuOpen = false;
+  }
+  syncRefineControls();
+}
+
+function setFiltersMenuOpen(isOpen) {
+  state.filtersMenuOpen = Boolean(isOpen) && state.hasSearched;
+  syncRefineControls();
+}
+
+function syncRefineControls() {
+  if (!els.refineRow || !els.filtersToggle || !els.filtersMenu) return;
+
+  const isCondensed = state.hasSearched;
+  const isMenuOpen = isCondensed && state.filtersMenuOpen;
+
+  els.refineRow.classList.toggle("is-condensed", isCondensed);
+  els.refineRow.classList.toggle("is-menu-open", isMenuOpen);
+  els.filtersToggle.hidden = !isCondensed;
+  els.filtersToggle.setAttribute("aria-expanded", String(isMenuOpen));
+  els.filtersMenu.hidden = isCondensed && !isMenuOpen;
 }
 
 async function loadCategories() {
@@ -637,8 +692,11 @@ function renderResults(rows) {
     if (row.image_url) {
       imageEl.src = row.image_url;
       imageEl.alt = row.title ? `${row.title} image` : "Listing image";
+      imageEl.classList.remove("is-placeholder");
     } else {
-      imageEl.remove();
+      imageEl.src = CARD_PLACEHOLDER_IMAGE;
+      imageEl.alt = "Listing image placeholder";
+      imageEl.classList.add("is-placeholder");
     }
 
     if (row.is_active_now) {
@@ -729,6 +787,9 @@ function setNearbyButtonState() {
 }
 
 async function handleUseLocation() {
+  setHasSearched(true);
+  setFiltersMenuOpen(false);
+
   if (!("geolocation" in navigator)) {
     state.nearbyEnabled = true;
     setNearbyButtonState();
@@ -848,6 +909,8 @@ async function renderNearbyMap(rows) {
     state.mapZoomControl = window.L.control.zoom({ position: "topright" }).addTo(state.map);
   }
 
+  forceZoomControlTopRight();
+
   state.mapLayer.clearLayers();
   const bounds = [];
 
@@ -896,6 +959,19 @@ async function renderNearbyMap(rows) {
   setTimeout(() => {
     state.map?.invalidateSize();
   }, 0);
+}
+
+function forceZoomControlTopRight() {
+  const mapRoot = els.nearbyMap;
+  if (!mapRoot) return;
+
+  const rightTop = mapRoot.querySelector(".leaflet-top.leaflet-right");
+  const leftZoomControls = mapRoot.querySelectorAll(".leaflet-top.leaflet-left .leaflet-control-zoom");
+  if (!rightTop || !leftZoomControls.length) return;
+
+  leftZoomControls.forEach((control) => {
+    rightTop.appendChild(control);
+  });
 }
 
 function ensureLeaflet() {
