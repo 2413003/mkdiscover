@@ -3,10 +3,10 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>MK Discover</title>
+  <title>MK</title>
   <meta
     name="description"
-    content="Discover what is happening, available, and worth knowing in Milton Keynes."
+    content="Find in MK."
   />
   <link rel="preconnect" href="https://unpkg.com" crossorigin />
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -14,22 +14,20 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="styles.css?v=20260413-marketplace" />
+  <link rel="stylesheet" href="styles.css?v=20260413-minimal" />
 </head>
 <body>
   <main class="app">
     <header id="hero" class="hero">
-      <div class="hero__copy">
-        <p class="hero__eyebrow">Milton Keynes, but easier</p>
-        <h1>Find something good nearby.</h1>
-        <p class="hero__lede">
-          Search local places, plans, groups, and useful finds across the city in one quick sweep.
-        </p>
-      </div>
-
       <div class="search-mode" role="tablist" aria-label="Search mode">
-        <button id="mode-discover" class="mode-button is-active" type="button" role="tab" aria-selected="true">Discover</button>
-        <button id="mode-plan" class="mode-button" type="button" role="tab" aria-selected="false">Plan</button>
+        <button id="mode-discover" class="mode-button is-active" type="button" role="tab" aria-selected="true" aria-label="Find">
+          <span class="ui-icon" aria-hidden="true">&#128269;</span>
+          <span class="sr-only">Find</span>
+        </button>
+        <button id="mode-plan" class="mode-button" type="button" role="tab" aria-selected="false" aria-label="Plan">
+          <span class="ui-icon" aria-hidden="true">&#128197;</span>
+          <span class="sr-only">Plan</span>
+        </button>
       </div>
 
       <form id="search-form" class="search-form" aria-label="Search Milton Keynes listings">
@@ -39,15 +37,18 @@
           name="q"
           type="search"
           autocomplete="off"
-          placeholder="Search MK: brunch, jobs, boxing, chess..."
+          placeholder="MK"
           aria-label="Search listings in Milton Keynes"
         />
-        <button type="submit">Search</button>
+        <button class="icon-button" type="submit" aria-label="Search">
+          <span class="ui-icon" aria-hidden="true">&#8594;</span>
+          <span class="sr-only">Search</span>
+        </button>
       </form>
 
       <form id="plan-form" class="plan-form" aria-label="Plan in Milton Keynes" hidden>
         <label class="plan-field" for="plan-when">
-          <span>When</span>
+          <span class="sr-only">When</span>
           <select id="plan-when" name="when">
             <option value="any">Any time</option>
             <option value="today">Today</option>
@@ -59,7 +60,7 @@
         </label>
 
         <label class="plan-field" for="plan-who">
-          <span>Who</span>
+          <span class="sr-only">Who</span>
           <select id="plan-who" name="who">
             <option value="any">Anyone</option>
             <option value="families">Families</option>
@@ -70,52 +71,67 @@
           </select>
         </label>
 
-        <button type="submit">Find plan</button>
+        <button class="icon-button" type="submit" aria-label="Plan">
+          <span class="ui-icon" aria-hidden="true">&#8594;</span>
+          <span class="sr-only">Plan</span>
+        </button>
       </form>
 
       <div id="status-line" class="status-line" aria-live="polite"></div>
 
       <div id="refine-row" class="refine-row" aria-label="Refine search results">
-        <button id="filters-toggle" class="ghost-button filters-toggle" type="button" aria-expanded="false" aria-controls="filters-menu" hidden>Filters</button>
+        <button id="filters-toggle" class="ghost-button filters-toggle icon-button" type="button" aria-expanded="false" aria-controls="filters-menu" aria-label="More" hidden>
+          <span class="ui-icon" aria-hidden="true">&#9776;</span>
+          <span class="sr-only">More</span>
+        </button>
 
         <div id="filters-menu" class="filters-menu">
           <label class="field field-select" for="category-filter">
-            <span class="field-label">Category</span>
+            <span class="field-label sr-only">Type</span>
             <select id="category-filter">
-              <option value="">All categories</option>
+              <option value="">All</option>
             </select>
           </label>
 
           <label class="field field-select" for="sort-filter">
-            <span class="field-label">Sort</span>
+            <span class="field-label sr-only">Sort</span>
             <select id="sort-filter">
-              <option value="relevance">Relevance</option>
-              <option value="newest">Newest</option>
-              <option value="popular">Most popular</option>
-              <option value="nearby">Nearby</option>
-              <option value="name">Name</option>
+              <option value="relevance">Best</option>
+              <option value="newest">New</option>
+              <option value="popular">Top</option>
+              <option value="nearby">Near</option>
+              <option value="name">A-Z</option>
             </select>
           </label>
 
           <label class="field field-toggle" for="open-now-filter">
             <input id="open-now-filter" type="checkbox" />
-            <span>Open now</span>
+            <span class="ui-icon" aria-hidden="true">&#9679;</span>
+            <span class="sr-only">Now</span>
           </label>
 
-          <button id="use-location-button" class="ghost-button" type="button">Near me</button>
+          <button id="use-location-button" class="ghost-button icon-button" type="button" aria-label="Near">
+            <span class="ui-icon" aria-hidden="true">&#9673;</span>
+            <span class="sr-only">Near</span>
+          </button>
         </div>
 
         <div class="refine-actions">
-          <button id="open-submit-panel" class="ghost-button" type="button">Add listing</button>
-          <button id="open-operator-panel" class="ghost-button" type="button">Moderate</button>
+          <button id="open-submit-panel" class="ghost-button icon-button" type="button" aria-label="Add">
+            <span class="ui-icon" aria-hidden="true">+</span>
+            <span class="sr-only">Add</span>
+          </button>
+          <button id="open-operator-panel" class="ghost-button icon-button" type="button" aria-label="Moderate">
+            <span class="ui-icon" aria-hidden="true">&#9881;</span>
+            <span class="sr-only">Moderate</span>
+          </button>
         </div>
       </div>
     </header>
 
     <section id="submit-panel" class="submit-panel" hidden>
       <div class="panel-head">
-        <h2>Add listing</h2>
-        <p>Posts go live immediately. Operators can edit or remove them later.</p>
+        <h2>Add</h2>
       </div>
 
       <form id="submit-form" class="submit-form">
@@ -125,35 +141,35 @@
         </label>
 
         <label class="submit-field" for="submit-category">
-          <span>Category</span>
+          <span>Type</span>
           <select id="submit-category" name="category" required>
             <option value="">Select category</option>
           </select>
         </label>
 
         <label class="submit-field submit-field--wide" for="submit-description">
-          <span>Description</span>
+          <span>Notes</span>
           <textarea id="submit-description" name="description" rows="3" maxlength="400" required></textarea>
         </label>
 
         <label class="submit-field" for="submit-website-url">
-          <span>Website URL</span>
+          <span>Site</span>
           <input id="submit-website-url" name="website_url" type="url" placeholder="https://..." />
         </label>
 
         <label class="submit-field" for="submit-booking-url">
-          <span>Booking URL</span>
+          <span>Book</span>
           <input id="submit-booking-url" name="booking_url" type="url" placeholder="https://..." />
         </label>
 
         <label class="submit-field" for="submit-location">
-          <span>Location</span>
+          <span>Place</span>
           <input id="submit-location" name="location" type="text" maxlength="180" placeholder="Area, venue, or postcode" />
         </label>
 
         <div class="submit-field submit-location-tools">
           <span>Pin</span>
-          <button id="submit-use-location-button" class="ghost-button" type="button">Use my location</button>
+          <button id="submit-use-location-button" class="ghost-button" type="button">Use</button>
           <small id="submit-location-status" class="submit-location-status"></small>
           <input id="submit-latitude" name="latitude" type="hidden" />
           <input id="submit-longitude" name="longitude" type="hidden" />
@@ -169,7 +185,7 @@
         </div>
 
         <label class="submit-field" for="submit-starts-at">
-          <span>Starts (optional)</span>
+          <span>Start</span>
           <input id="submit-starts-at" name="starts_at" type="datetime-local" />
         </label>
 
@@ -189,7 +205,7 @@
         </label>
 
         <div class="submit-actions">
-          <button id="submit-button" type="submit">Submit</button>
+          <button id="submit-button" type="submit">Add</button>
           <button id="close-submit-panel" class="ghost-button" type="button">Close</button>
         </div>
       </form>
@@ -199,22 +215,22 @@
 
     <section id="operator-panel" class="operator-panel" hidden>
       <div class="panel-head">
-        <h2>Moderate listings</h2>
-        <p id="operator-status-text">Sign in to edit or remove listings.</p>
+        <h2>Mod</h2>
+        <p id="operator-status-text"></p>
       </div>
 
       <form id="operator-login-form" class="operator-login">
         <label class="submit-field" for="operator-email">
-          <span>Operator email</span>
+          <span>Email</span>
           <input id="operator-email" name="operator_email" type="email" required placeholder="you@example.com" />
         </label>
-        <button id="operator-login-button" type="submit">Send sign-in link</button>
+        <button id="operator-login-button" type="submit">Send</button>
       </form>
 
       <div class="operator-actions">
-        <button id="operator-claim-button" class="ghost-button" type="button" hidden>Claim operator access</button>
-        <button id="operator-refresh-button" class="ghost-button" type="button" hidden>Refresh listings</button>
-        <button id="operator-signout-button" class="ghost-button" type="button" hidden>Sign out</button>
+        <button id="operator-claim-button" class="ghost-button" type="button" hidden>Claim</button>
+        <button id="operator-refresh-button" class="ghost-button" type="button" hidden>Sync</button>
+        <button id="operator-signout-button" class="ghost-button" type="button" hidden>Out</button>
       </div>
 
       <p id="operator-feedback" class="operator-feedback" aria-live="polite"></p>
@@ -224,23 +240,14 @@
     <section class="discovery-layout">
       <section class="discovery-list">
         <section id="results-head" class="results-head">
-          <h2>
-            <span class="results-head__desktop">Results</span>
-            <span class="results-head__mobile">Popular in Milton Keynes</span>
-          </h2>
-          <button class="results-head__next" type="button" aria-label="Next section">&#8594;</button>
-          <p id="results-summary">No results yet.</p>
+          <p id="results-summary"></p>
         </section>
         <section id="results-grid" class="results-grid"></section>
       </section>
 
       <aside id="nearby-panel" class="nearby-panel" hidden>
         <div class="nearby-panel__head">
-          <div>
-            <h2>Map</h2>
-            <p>See what is close by.</p>
-          </div>
-          <p id="nearby-summary">Map ready when location is available.</p>
+          <p id="nearby-summary"></p>
         </div>
         <div id="nearby-map" class="nearby-map" aria-label="Nearby listings map"></div>
       </aside>
@@ -249,15 +256,15 @@
     <nav class="mobile-bottom-nav" aria-label="Primary">
       <button class="mobile-bottom-nav__item is-active" type="button">
         <span class="mobile-bottom-nav__icon" aria-hidden="true">&#128269;</span>
-        <span>Explore</span>
+        <span class="sr-only">Explore</span>
       </button>
       <button class="mobile-bottom-nav__item" type="button">
         <span class="mobile-bottom-nav__icon" aria-hidden="true">&#9825;</span>
-        <span>Saved</span>
+        <span class="sr-only">Saved</span>
       </button>
       <button class="mobile-bottom-nav__item" type="button">
         <span class="mobile-bottom-nav__icon" aria-hidden="true">&#9711;</span>
-        <span>Log in</span>
+        <span class="sr-only">Log in</span>
       </button>
     </nav>
   </main>
