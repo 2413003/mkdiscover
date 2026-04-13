@@ -616,8 +616,9 @@ function renderNearbyPanel(rows) {
   }
 
   if (!state.userLocation) {
-    setNearbySummary("Use Near me to sort by distance.");
-    setNearbyMapEmptyState(true);
+    setNearbySummary("Milton Keynes map");
+    setNearbyMapEmptyState(false);
+    void renderNearbyMap([]);
     return;
   }
 
@@ -627,7 +628,8 @@ function renderNearbyPanel(rows) {
 
   if (!nearbyRows.length) {
     setNearbySummary("No pinned locations yet.");
-    setNearbyMapEmptyState(true);
+    setNearbyMapEmptyState(false);
+    void renderNearbyMap([]);
     return;
   }
 
@@ -689,7 +691,8 @@ async function handleUseLocation() {
 
     if (!isMiltonKeynesCoordinate(nextLocation.lat, nextLocation.lng)) {
       setNearbySummary("Location is outside Milton Keynes.");
-      setNearbyMapEmptyState(true);
+      setNearbyMapEmptyState(false);
+      void renderNearbyMap([]);
       return;
     }
 
@@ -702,7 +705,8 @@ async function handleUseLocation() {
   } catch (error) {
     console.error(error);
     setNearbySummary("Location blocked. Allow location for nearby sort.");
-    setNearbyMapEmptyState(true);
+    setNearbyMapEmptyState(false);
+    void renderNearbyMap([]);
   } finally {
     els.useLocationButton.disabled = false;
   }
