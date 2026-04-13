@@ -45,7 +45,7 @@ html {
 
 body {
   min-height: 100vh;
-  font-family: "Manrope", "Segoe UI", sans-serif;
+  font-family: "Sora", "Segoe UI", sans-serif;
   color: var(--ink);
   background:
     radial-gradient(circle at top, #ffffff 0%, #fcfaf7 22%, var(--bg) 68%),
