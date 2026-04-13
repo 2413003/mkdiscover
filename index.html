@@ -4,105 +4,198 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>MK Discover</title>
-  <meta name="description" content="Discover what is happening, available, and worth knowing in Milton Keynes." />
+  <meta
+    name="description"
+    content="Search, plan, and review what is happening across Milton Keynes in a polished local discovery workspace."
+  />
   <link rel="preconnect" href="https://unpkg.com" crossorigin />
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <link rel="preload" as="script" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="styles.css?v=20260413ag" />
+  <link
+    href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap"
+    rel="stylesheet"
+  />
+  <link rel="stylesheet" href="styles.css?v=20260413-enterprise" />
 </head>
 <body>
   <main class="app">
-    <header id="hero" class="hero">
-      <div class="search-mode" role="tablist" aria-label="Search mode">
-        <button id="mode-discover" class="mode-button is-active" type="button" role="tab" aria-selected="true">Discover</button>
-        <button id="mode-plan" class="mode-button" type="button" role="tab" aria-selected="false">Plan</button>
+    <header class="topbar">
+      <div class="topbar__brand">
+        <div class="brand-mark" aria-hidden="true">MK</div>
+        <div class="brand-copy">
+          <span id="brand-name" class="brand-name">MK Discover</span>
+          <span id="brand-location" class="brand-subtitle">Milton Keynes discovery workspace</span>
+        </div>
       </div>
 
-      <form id="search-form" class="search-form" aria-label="Search Milton Keynes listings">
-        <label class="sr-only" for="search-input">Search listings in Milton Keynes</label>
-        <input
-          id="search-input"
-          name="q"
-          type="search"
-          autocomplete="off"
-          placeholder="Search MK: brunch, jobs, boxing, chess..."
-          aria-label="Search listings in Milton Keynes"
-        />
-        <button type="submit">Search</button>
-      </form>
+      <nav class="topbar__nav" aria-label="Section navigation">
+        <a href="#hero">Workspace</a>
+        <a href="#results-head">Listings</a>
+        <a href="#nearby-panel">Coverage</a>
+      </nav>
 
-      <form id="plan-form" class="plan-form" aria-label="Plan in Milton Keynes" hidden>
-        <label class="plan-field" for="plan-when">
-          <span>When</span>
-          <select id="plan-when" name="when">
-            <option value="any">Any time</option>
-            <option value="today">Today</option>
-            <option value="tonight">Tonight</option>
-            <option value="this-week">This week</option>
-            <option value="this-weekend">This weekend</option>
-            <option value="next-30-days">Next 30 days</option>
-          </select>
-        </label>
-
-        <label class="plan-field" for="plan-who">
-          <span>Who</span>
-          <select id="plan-who" name="who">
-            <option value="any">Anyone</option>
-            <option value="families">Families</option>
-            <option value="kids">Kids</option>
-            <option value="couples">Couples</option>
-            <option value="friends">Friends</option>
-            <option value="solo">Solo</option>
-          </select>
-        </label>
-
-        <button type="submit">Find plan</button>
-      </form>
-
-      <div id="refine-row" class="refine-row" aria-label="Refine search results">
-        <button id="filters-toggle" class="ghost-button filters-toggle" type="button" aria-expanded="false" aria-controls="filters-menu" hidden>Filters</button>
-
-        <div id="filters-menu" class="filters-menu">
-          <label class="field field-select" for="category-filter">
-            <span class="field-label">Category</span>
-            <select id="category-filter">
-              <option value="">All categories</option>
-            </select>
-          </label>
-
-          <label class="field field-select" for="sort-filter">
-            <span class="field-label">Sort</span>
-            <select id="sort-filter">
-              <option value="relevance">Relevance</option>
-              <option value="newest">Newest</option>
-              <option value="popular">Most popular</option>
-              <option value="nearby">Nearby</option>
-              <option value="name">Name</option>
-            </select>
-          </label>
-
-          <label class="field field-toggle" for="open-now-filter">
-            <input id="open-now-filter" type="checkbox" />
-            <span>Open now</span>
-          </label>
-
-          <button id="use-location-button" class="ghost-button" type="button">Near me</button>
-        </div>
-
-        <div class="refine-actions">
-          <button id="open-submit-panel" class="ghost-button" type="button">Add listing</button>
-          <button id="open-operator-panel" class="ghost-button" type="button">Moderate</button>
-        </div>
+      <div class="topbar__actions">
+        <button id="open-submit-panel" class="solid-button" type="button">Submit listing</button>
+        <button id="open-operator-panel" class="ghost-button" type="button">Operator access</button>
       </div>
     </header>
 
+    <section id="hero" class="hero">
+      <div class="hero__intro">
+        <p class="section-kicker">Milton Keynes market intelligence</p>
+        <h1>Search the city with a cleaner, decision-ready operating view.</h1>
+        <p class="hero__lede">
+          MK Discover brings live local listings, planning filters, and map coverage into one
+          workspace that feels ready for public users and operators alike.
+        </p>
+
+        <div class="hero__stats" aria-label="Workspace summary">
+          <article class="hero-stat">
+            <span class="hero-stat__label">Indexed listings</span>
+            <strong id="metric-total">0</strong>
+            <p>Published records available to search.</p>
+          </article>
+
+          <article class="hero-stat">
+            <span class="hero-stat__label">Current scope</span>
+            <strong id="metric-scope">0</strong>
+            <p>Listings matching the active view.</p>
+          </article>
+
+          <article class="hero-stat">
+            <span class="hero-stat__label">Open now</span>
+            <strong id="metric-open">0</strong>
+            <p>Live places and activities in the feed.</p>
+          </article>
+
+          <article class="hero-stat">
+            <span class="hero-stat__label">Categories</span>
+            <strong id="metric-categories">0</strong>
+            <p>Coverage across Milton Keynes sectors.</p>
+          </article>
+        </div>
+
+        <div id="status-line" class="status-line" aria-live="polite"></div>
+      </div>
+
+      <div class="hero__workspace">
+        <section class="workspace-panel" aria-label="Discovery controls">
+          <div class="workspace-panel__head">
+            <div>
+              <p class="section-kicker">Discovery workspace</p>
+              <h2>Live search and planning controls</h2>
+            </div>
+            <p class="workspace-panel__note">
+              Switch between direct search and planning mode without leaving the workspace.
+            </p>
+          </div>
+
+          <div class="search-mode" role="tablist" aria-label="Search mode">
+            <button
+              id="mode-discover"
+              class="mode-button is-active"
+              type="button"
+              role="tab"
+              aria-selected="true"
+            >
+              Discover
+            </button>
+            <button id="mode-plan" class="mode-button" type="button" role="tab" aria-selected="false">
+              Plan
+            </button>
+          </div>
+
+          <form id="search-form" class="search-form" aria-label="Search Milton Keynes listings">
+            <label class="sr-only" for="search-input">Search listings in Milton Keynes</label>
+            <input
+              id="search-input"
+              name="q"
+              type="search"
+              autocomplete="off"
+              placeholder="Search venues, services, events, careers..."
+              aria-label="Search listings in Milton Keynes"
+            />
+            <button type="submit">Search MK</button>
+          </form>
+
+          <form id="plan-form" class="plan-form" aria-label="Plan in Milton Keynes" hidden>
+            <label class="plan-field" for="plan-when">
+              <span>When</span>
+              <select id="plan-when" name="when">
+                <option value="any">Any time</option>
+                <option value="today">Today</option>
+                <option value="tonight">Tonight</option>
+                <option value="this-week">This week</option>
+                <option value="this-weekend">This weekend</option>
+                <option value="next-30-days">Next 30 days</option>
+              </select>
+            </label>
+
+            <label class="plan-field" for="plan-who">
+              <span>Who</span>
+              <select id="plan-who" name="who">
+                <option value="any">Anyone</option>
+                <option value="families">Families</option>
+                <option value="kids">Kids</option>
+                <option value="couples">Couples</option>
+                <option value="friends">Friends</option>
+                <option value="solo">Solo</option>
+              </select>
+            </label>
+
+            <button type="submit">Build plan</button>
+          </form>
+
+          <div id="refine-row" class="refine-row" aria-label="Refine search results">
+            <button
+              id="filters-toggle"
+              class="ghost-button filters-toggle"
+              type="button"
+              aria-expanded="false"
+              aria-controls="filters-menu"
+              hidden
+            >
+              Filters
+            </button>
+
+            <div id="filters-menu" class="filters-menu">
+              <label class="field field-select" for="category-filter">
+                <span class="field-label">Category</span>
+                <select id="category-filter">
+                  <option value="">All categories</option>
+                </select>
+              </label>
+
+              <label class="field field-select" for="sort-filter">
+                <span class="field-label">Sort</span>
+                <select id="sort-filter">
+                  <option value="relevance">Relevance</option>
+                  <option value="newest">Newest</option>
+                  <option value="popular">Most popular</option>
+                  <option value="nearby">Nearby</option>
+                  <option value="name">Name</option>
+                </select>
+              </label>
+
+              <label class="field field-toggle" for="open-now-filter">
+                <input id="open-now-filter" type="checkbox" />
+                <span>Open now</span>
+              </label>
+
+              <button id="use-location-button" class="ghost-button" type="button">Use my location</button>
+            </div>
+          </div>
+        </section>
+      </div>
+    </section>
+
     <section id="submit-panel" class="submit-panel" hidden>
       <div class="submit-panel__head">
+        <p class="section-kicker">Submission workflow</p>
         <h2>Add listing</h2>
-        <p>Posts go live immediately. Operators can edit or remove them.</p>
+        <p>New listings appear immediately. Operators can edit or remove them after review.</p>
       </div>
 
       <form id="submit-form" class="submit-form">
@@ -137,6 +230,7 @@
           <span>Location</span>
           <input id="submit-location" name="location" type="text" maxlength="180" placeholder="Area, venue, or postcode" />
         </label>
+
         <div class="submit-field submit-location-tools">
           <span>Pin</span>
           <button id="submit-use-location-button" class="ghost-button" type="button">Use my location</button>
@@ -155,7 +249,7 @@
         </div>
 
         <label class="submit-field" for="submit-starts-at">
-          <span>Starts (optional)</span>
+          <span>Starts</span>
           <input id="submit-starts-at" name="starts_at" type="datetime-local" />
         </label>
 
@@ -175,7 +269,7 @@
         </label>
 
         <div class="submit-actions">
-          <button id="submit-button" type="submit">Submit</button>
+          <button id="submit-button" type="submit">Submit listing</button>
           <button id="close-submit-panel" class="ghost-button" type="button">Close</button>
         </div>
       </form>
@@ -185,6 +279,7 @@
 
     <section id="operator-panel" class="operator-panel" hidden>
       <div class="operator-panel__head">
+        <p class="section-kicker">Operator workflow</p>
         <h2>Moderate listings</h2>
         <p id="operator-status-text">Sign in to edit or remove listings.</p>
       </div>
@@ -210,54 +305,55 @@
     <section class="discovery-layout">
       <section class="discovery-list">
         <section id="results-head" class="results-head">
-          <h2>
-            <span class="results-head__desktop">Results</span>
-            <span class="results-head__mobile">Popular in Milton Keynes</span>
-          </h2>
-          <button class="results-head__next" type="button" aria-label="Next section">&#8594;</button>
+          <div class="results-head__copy">
+            <p class="section-kicker">Discovery pipeline</p>
+            <h2>Results in scope</h2>
+          </div>
           <p id="results-summary">No results yet.</p>
         </section>
+
         <section id="results-grid" class="results-grid"></section>
       </section>
 
       <aside id="nearby-panel" class="nearby-panel" hidden>
+        <div class="nearby-panel__head">
+          <div>
+            <p class="section-kicker">Geographic context</p>
+            <h2>Milton Keynes coverage map</h2>
+          </div>
+          <p id="nearby-summary">Map ready when location is available.</p>
+        </div>
+
         <div id="nearby-map" class="nearby-map" aria-label="Nearby listings map"></div>
       </aside>
     </section>
-
-    <nav class="mobile-bottom-nav" aria-label="Primary">
-      <button class="mobile-bottom-nav__item is-active" type="button">
-        <span class="mobile-bottom-nav__icon" aria-hidden="true">&#128269;</span>
-        <span>Explore</span>
-      </button>
-      <button class="mobile-bottom-nav__item" type="button">
-        <span class="mobile-bottom-nav__icon" aria-hidden="true">&#9825;</span>
-        <span>Wishlists</span>
-      </button>
-      <button class="mobile-bottom-nav__item" type="button">
-        <span class="mobile-bottom-nav__icon" aria-hidden="true">&#9711;</span>
-        <span>Log in</span>
-      </button>
-    </nav>
   </main>
 
   <template id="result-card-template">
     <article class="result-card">
-      <img class="result-card__image" alt="" loading="lazy" />
-      <div class="result-card__top">
-        <span class="result-card__category"></span>
-        <span class="result-card__state"></span>
+      <div class="result-card__media">
+        <img class="result-card__image" alt="" loading="lazy" />
       </div>
-      <h3 class="result-card__title"></h3>
-      <p class="result-card__description"></p>
-      <div class="result-card__meta"></div>
-      <div class="result-card__action"></div>
+
+      <div class="result-card__body">
+        <div class="result-card__top">
+          <span class="result-card__category"></span>
+          <span class="result-card__state"></span>
+        </div>
+        <h3 class="result-card__title"></h3>
+        <p class="result-card__description"></p>
+        <div class="result-card__meta"></div>
+        <div class="result-card__footer">
+          <div class="result-card__footnote"></div>
+          <div class="result-card__action"></div>
+        </div>
+      </div>
     </article>
   </template>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" defer></script>
   <script src="config.js?v=20260413o"></script>
-  <script src="app.js?v=20260413ae"></script>
+  <script src="app.js?v=20260413-enterprise"></script>
 </body>
 </html>

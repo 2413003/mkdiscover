@@ -16,6 +16,7 @@ const CARD_PLACEHOLDER_IMAGE = `data:image/svg+xml,${encodeURIComponent(
 )}`;
 const LEAFLET_CSS_URL = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
 const LEAFLET_JS_URL = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
+const INTEGER_FORMATTER = new Intl.NumberFormat("en-GB");
 const DEFAULT_CATEGORIES = [
   { slug: "events", name: "Events" },
   { slug: "restaurants", name: "Restaurants" },
@@ -87,9 +88,15 @@ const state = {
 };
 
 const els = {
+  brandName: document.getElementById("brand-name"),
+  brandLocation: document.getElementById("brand-location"),
   modeDiscover: document.getElementById("mode-discover"),
   modePlan: document.getElementById("mode-plan"),
   hero: document.getElementById("hero"),
+  metricTotal: document.getElementById("metric-total"),
+  metricScope: document.getElementById("metric-scope"),
+  metricOpen: document.getElementById("metric-open"),
+  metricCategories: document.getElementById("metric-categories"),
   resultsHead: document.getElementById("results-head"),
   refineRow: document.getElementById("refine-row"),
   filtersToggle: document.getElementById("filters-toggle"),
@@ -141,6 +148,7 @@ init();
 
 async function init() {
   wireEvents();
+  applyBranding();
   setSearchMode(state.mode);
   setupHeroCondense();
   syncHeroCondensed();
@@ -660,6 +668,7 @@ function applyFilters() {
   renderSummary();
   renderResults(rows);
   renderNearbyPanel(rows);
+  updateOverviewMetrics();
 }
 
 function renderSummary() {
@@ -738,6 +747,8 @@ function renderResults(rows) {
     const titleEl = fragment.querySelector(".result-card__title");
     const descriptionEl = fragment.querySelector(".result-card__description");
     const metaEl = fragment.querySelector(".result-card__meta");
+    const footerEl = fragment.querySelector(".result-card__footer");
+    const footnoteEl = fragment.querySelector(".result-card__footnote");
     const actionEl = fragment.querySelector(".result-card__action");
 
     categoryEl.textContent = humaniseSlug(row.category_slug || "listing");
@@ -769,19 +780,32 @@ function renderResults(rows) {
     }
 
     const location = row.address_text || row.postcode;
+    if (row.verified_at) appendMeta(metaEl, "Verified");
     if (row.starts_at) appendMeta(metaEl, `Starts ${formatDateTime(row.starts_at)}`);
     if (location) appendMeta(metaEl, location);
     if (Number.isFinite(row._distanceKm)) appendMeta(metaEl, `${formatDistance(row._distanceKm)} away`);
+    if (row.updated_at) appendMeta(metaEl, `Updated ${formatDateTime(row.updated_at)}`);
 
     if (!metaEl.childElementCount) {
       metaEl.remove();
     }
 
+    const footnote = formatListingFootnote(row);
+    if (footnote) {
+      footnoteEl.textContent = footnote;
+    } else {
+      footnoteEl.remove();
+    }
+
     const actionUrl = row.booking_url || row.website_url;
     if (actionUrl) {
-      actionEl.appendChild(makeAction("View", actionUrl));
+      actionEl.appendChild(makeAction(row.booking_url ? "Book now" : "Visit site", actionUrl));
     } else {
       actionEl.remove();
+    }
+
+    if (!footnote && !actionUrl) {
+      footerEl.remove();
     }
 
     els.resultsGrid.appendChild(fragment);
@@ -1126,6 +1150,37 @@ function makeAction(label, href) {
   return link;
 }
 
+function applyBranding() {
+  const appName = String(config.APP_NAME || "MK Discover").trim() || "MK Discover";
+  const location = String(config.APP_LOCATION || "Milton Keynes").trim() || "Milton Keynes";
+
+  if (els.brandName) {
+    els.brandName.textContent = appName;
+  }
+
+  if (els.brandLocation) {
+    els.brandLocation.textContent = `${location} discovery workspace`;
+  }
+}
+
+function updateOverviewMetrics() {
+  if (els.metricTotal) {
+    els.metricTotal.textContent = formatCount(state.listings.length);
+  }
+
+  if (els.metricScope) {
+    els.metricScope.textContent = formatCount(state.filtered.length);
+  }
+
+  if (els.metricOpen) {
+    els.metricOpen.textContent = formatCount(state.filtered.filter((row) => row.is_active_now).length);
+  }
+
+  if (els.metricCategories) {
+    els.metricCategories.textContent = formatCount(state.categories.length);
+  }
+}
+
 function sortNearbyRows(a, b) {
   const aHasDistance = Number.isFinite(a._distanceKm);
   const bHasDistance = Number.isFinite(b._distanceKm);
@@ -1437,6 +1492,11 @@ function humaniseSlug(slug) {
   return slug.replace(/[-_]/g, " ").replace(/\b\w/g, (character) => character.toUpperCase());
 }
 
+function formatCount(value) {
+  const count = Number(value || 0);
+  return INTEGER_FORMATTER.format(Number.isFinite(count) ? Math.max(0, Math.round(count)) : 0);
+}
+
 function formatDateTime(value) {
   try {
     return new Intl.DateTimeFormat("en-GB", {
@@ -1494,6 +1554,34 @@ function setStatus(message, tone = "neutral") {
   } else {
     els.statusLine.setAttribute("data-tone", tone);
   }
+}
+
+function formatListingFootnote(row) {
+  if (row.verified_at && row.source_name) {
+    return `Verified via ${formatSourceName(row.source_name)}`;
+  }
+
+  if (row.verified_at) {
+    return "Verified listing";
+  }
+
+  if (row.source_name) {
+    return `Source: ${formatSourceName(row.source_name)}`;
+  }
+
+  return "";
+}
+
+function formatSourceName(sourceName) {
+  const raw = String(sourceName || "").trim();
+  if (!raw) return "";
+  if (raw.toLowerCase().startsWith("user submission")) {
+    return "community submission";
+  }
+  if (raw.length <= 42) {
+    return raw;
+  }
+  return `${raw.slice(0, 39).trim()}...`;
 }
 
 function renderDisconnectedState() {
