@@ -233,7 +233,7 @@ h1 {
 }
 
 .nearby-map {
-  height: 320px;
+  height: 300px;
   width: 100%;
   background: linear-gradient(180deg, #f9fbfc 0%, #eff3f6 100%);
 }
@@ -243,13 +243,21 @@ h1 {
 }
 
 .nearby-map[data-empty="true"]::after {
-  content: "Nearby markers appear here.";
+  content: "Pinned nearby places appear here.";
   position: absolute;
   inset: 0;
   display: grid;
   place-items: center;
   color: var(--muted);
   font-weight: 600;
+}
+
+.nearby-map .leaflet-control-zoom a {
+  color: #0f1215;
+}
+
+.nearby-map .leaflet-popup-content-wrapper {
+  border-radius: 12px;
 }
 
 .submit-panel {
@@ -323,6 +331,23 @@ h1 {
 
 .submit-field--wide {
   grid-column: 1 / -1;
+}
+
+.submit-location-tools {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.submit-location-tools .ghost-button {
+  width: fit-content;
+  min-height: 42px;
+}
+
+.submit-location-status {
+  color: var(--muted);
+  font-size: 0.86rem;
+  min-height: 1.2em;
 }
 
 .submit-image-preview-wrap {

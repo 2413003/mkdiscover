@@ -4,26 +4,46 @@ const CACHE_MAX_AGE_MS = 1000 * 60 * 15;
 const INITIAL_LOAD_TIMEOUT_MS = 1500;
 const LISTING_IMAGE_BUCKET = "listing-images";
 const MAX_IMAGE_SIZE_BYTES = 5 * 1024 * 1024;
-const GEOCODE_CACHE_KEY = "mk_discover_geocode_cache_v1";
-const GEOCODE_CACHE_MAX_AGE_MS = 1000 * 60 * 60 * 24 * 30;
-const NEARBY_GEOCODE_LIMIT = 40;
-const GEOCODE_TIMEOUT_MS = 2200;
 const MK_FALLBACK_CENTER = { lat: 52.0406, lng: -0.7594 };
 const LEAFLET_CSS_URL = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
 const LEAFLET_JS_URL = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
 const DEFAULT_CATEGORIES = [
   { slug: "events", name: "Events" },
-  { slug: "food-and-drink", name: "Food & Drink" },
+  { slug: "restaurants", name: "Restaurants" },
+  { slug: "cafes", name: "Cafes" },
+  { slug: "pubs-and-bars", name: "Pubs & Bars" },
+  { slug: "takeaways-and-delivery", name: "Takeaways & Delivery" },
   { slug: "clubs-and-communities", name: "Clubs & Communities" },
-  { slug: "fitness-and-sport", name: "Fitness & Sport" },
-  { slug: "classes-and-courses", name: "Classes & Courses" },
-  { slug: "venues-and-spaces", name: "Venues & Spaces" },
-  { slug: "volunteering", name: "Volunteering" },
-  { slug: "jobs", name: "Jobs" },
+  { slug: "social-groups", name: "Social Groups" },
+  { slug: "social-media-and-creators", name: "Social Media & Creators" },
+  { slug: "gyms-and-fitness", name: "Gyms & Fitness" },
+  { slug: "sports-clubs", name: "Sports Clubs" },
+  { slug: "schools-and-colleges", name: "Schools & Colleges" },
+  { slug: "nurseries-and-childcare", name: "Nurseries & Childcare" },
+  { slug: "tutors-and-tuition", name: "Tutors & Tuition" },
   { slug: "family-and-kids", name: "Family & Kids" },
+  { slug: "classes-and-courses", name: "Classes & Courses" },
   { slug: "arts-and-culture", name: "Arts & Culture" },
-  { slug: "nightlife", name: "Nightlife" },
-  { slug: "services", name: "Services" }
+  { slug: "music-and-nightlife", name: "Music & Nightlife" },
+  { slug: "shopping-and-retail", name: "Shopping & Retail" },
+  { slug: "beauty-and-wellbeing", name: "Beauty & Wellbeing" },
+  { slug: "healthcare", name: "Healthcare" },
+  { slug: "dentists-opticians-pharmacy", name: "Dentists, Opticians & Pharmacy" },
+  { slug: "mental-health-support", name: "Mental Health Support" },
+  { slug: "parks-and-outdoors", name: "Parks & Outdoors" },
+  { slug: "venues-and-spaces", name: "Venues & Spaces" },
+  { slug: "coworking-and-study-spaces", name: "Coworking & Study Spaces" },
+  { slug: "jobs-and-careers", name: "Jobs & Careers" },
+  { slug: "charities-and-volunteering", name: "Charities & Volunteering" },
+  { slug: "faith-and-community", name: "Faith & Community" },
+  { slug: "automotive", name: "Automotive" },
+  { slug: "transport-and-travel", name: "Transport & Travel" },
+  { slug: "home-services", name: "Home Services" },
+  { slug: "trades-and-repairs", name: "Trades & Repairs" },
+  { slug: "property-and-rentals", name: "Property & Rentals" },
+  { slug: "business-services", name: "Business Services" },
+  { slug: "pets-and-vets", name: "Pets & Vets" },
+  { slug: "local-deals", name: "Local Deals" }
 ];
 
 const state = {
@@ -45,10 +65,6 @@ const state = {
   previewObjectUrl: null,
   nearbyEnabled: false,
   userLocation: null,
-  geocodeCache: {},
-  rowCoordinates: {},
-  geocodeInFlight: false,
-  pendingGeocodeRows: null,
   leafletPromise: null,
   map: null,
   mapLayer: null
@@ -78,6 +94,10 @@ const els = {
   submitImageFile: document.getElementById("submit-image-file"),
   submitImagePreviewWrap: document.getElementById("submit-image-preview-wrap"),
   submitImagePreview: document.getElementById("submit-image-preview"),
+  submitUseLocationButton: document.getElementById("submit-use-location-button"),
+  submitLatitude: document.getElementById("submit-latitude"),
+  submitLongitude: document.getElementById("submit-longitude"),
+  submitLocationStatus: document.getElementById("submit-location-status"),
   openOperatorPanel: document.getElementById("open-operator-panel"),
   operatorPanel: document.getElementById("operator-panel"),
   operatorStatusText: document.getElementById("operator-status-text"),
@@ -95,7 +115,6 @@ init();
 
 async function init() {
   wireEvents();
-  state.geocodeCache = loadGeocodeCache();
   setNearbyButtonState();
   const publicKey = config.SUPABASE_PUBLISHABLE_KEY || config.SUPABASE_ANON_KEY;
   state.configured = Boolean(config.SUPABASE_URL && publicKey);
@@ -222,6 +241,7 @@ function wireEvents() {
 
   els.submitForm.addEventListener("submit", handleSubmitListing);
   els.submitImageFile.addEventListener("change", handleImageFileChange);
+  els.submitUseLocationButton?.addEventListener("click", handleSubmitUseLocation);
 
   els.openOperatorPanel.addEventListener("click", async () => {
     toggleOperatorPanel();
@@ -257,9 +277,42 @@ async function loadCategories() {
 }
 
 async function loadListings() {
-  const { data, error } = await state.supabasePublic
-    .from("search_documents")
-    .select(`
+  const baseQuery = (selectColumns) =>
+    state.supabasePublic
+      .from("search_documents")
+      .select(selectColumns)
+      .eq("status", "published")
+      .order("quality_score", { ascending: false })
+      .order("updated_at", { ascending: false })
+      .limit(160);
+
+  const withCoordinates = `
+      id,
+      title,
+      slug,
+      category_slug,
+      short_description,
+      long_description,
+      image_url,
+      website_url,
+      booking_url,
+      address_text,
+      postcode,
+      latitude,
+      longitude,
+      tags,
+      is_active_now,
+      starts_at,
+      ends_at,
+      verified_at,
+      source_name,
+      updated_at,
+      quality_score
+    `;
+
+  let result = await baseQuery(withCoordinates);
+  if (result.error && isMissingColumnError(result.error, ["latitude", "longitude"])) {
+    const fallbackColumns = `
       id,
       title,
       slug,
@@ -279,14 +332,12 @@ async function loadListings() {
       source_name,
       updated_at,
       quality_score
-    `)
-    .eq("status", "published")
-    .order("quality_score", { ascending: false })
-    .order("updated_at", { ascending: false })
-    .limit(160);
+    `;
+    result = await baseQuery(fallbackColumns);
+  }
 
-  if (error) throw error;
-  state.listings = data || [];
+  if (result.error) throw result.error;
+  state.listings = result.data || [];
 }
 
 function hydrateFilters() {
@@ -307,8 +358,21 @@ function hydrateFilters() {
 }
 
 function ensureCategoriesAvailable() {
-  if (Array.isArray(state.categories) && state.categories.length) return;
-  state.categories = [...DEFAULT_CATEGORIES];
+  const merged = new Map();
+
+  for (const category of Array.isArray(state.categories) ? state.categories : []) {
+    if (!category?.slug || !category?.name) continue;
+    merged.set(category.slug, { slug: category.slug, name: category.name });
+  }
+
+  for (const category of DEFAULT_CATEGORIES) {
+    if (!category?.slug || !category?.name) continue;
+    if (!merged.has(category.slug)) {
+      merged.set(category.slug, { slug: category.slug, name: category.name });
+    }
+  }
+
+  state.categories = [...merged.values()].sort((a, b) => a.name.localeCompare(b.name, "en-GB"));
 }
 
 function hydrateFromCache() {
@@ -417,7 +481,6 @@ function applyFilters() {
   renderSummary();
   renderResults(rows);
   renderNearbyPanel(rows);
-  queueNearbyGeocoding(rows);
 }
 
 function renderSummary() {
@@ -552,15 +615,21 @@ function renderNearbyPanel(rows) {
     return;
   }
 
-  const nearbyRows = rows.filter((row) => Number.isFinite(row._distanceKm)).slice(0, 30);
+  const allNearbyRows = rows.filter((row) => Number.isFinite(row._distanceKm));
+  const nearbyRows = allNearbyRows.slice(0, 30);
+  const missingPins = rows.length - allNearbyRows.length;
 
   if (!nearbyRows.length) {
-    setNearbySummary("Finding nearby listings...");
+    setNearbySummary("No pinned locations yet.");
     setNearbyMapEmptyState(true);
     return;
   }
 
-  setNearbySummary(`${nearbyRows.length} nearby`);
+  let summary = `${allNearbyRows.length} nearby`;
+  if (missingPins > 0) {
+    summary += ` | ${missingPins} unpinned`;
+  }
+  setNearbySummary(summary);
   setNearbyMapEmptyState(false);
   void renderNearbyMap(nearbyRows);
 }
@@ -631,191 +700,43 @@ function getCurrentPosition(options) {
   });
 }
 
-function queueNearbyGeocoding(rows) {
-  if (!state.userLocation) return;
-  if (!rows?.length) return;
-
-  if (state.geocodeInFlight) {
-    state.pendingGeocodeRows = rows;
+async function handleSubmitUseLocation() {
+  if (!("geolocation" in navigator)) {
+    setSubmitLocationStatus("Location is not available in this browser.");
     return;
   }
 
-  void runNearbyGeocoding(rows);
-}
-
-async function runNearbyGeocoding(rows) {
-  const pendingByQuery = new Map();
-  let cachedHits = 0;
-  let scanned = 0;
-
-  for (const row of rows) {
-    if (scanned >= NEARBY_GEOCODE_LIMIT) break;
-    if (getRowCoordinates(row)) continue;
-
-    const query = buildGeocodeQuery(row);
-    if (!query) continue;
-
-    scanned += 1;
-    const cached = getCachedGeocode(query);
-    if (cached) {
-      state.rowCoordinates[row.id] = cached;
-      cachedHits += 1;
-      continue;
-    }
-
-    const ids = pendingByQuery.get(query) || [];
-    ids.push(row.id);
-    pendingByQuery.set(query, ids);
-  }
-
-  const candidates = Array.from(pendingByQuery.entries()).map(([query, ids]) => ({ query, ids }));
-
-  if (!candidates.length) {
-    if (cachedHits) {
-      applyFilters();
-    }
-    return;
-  }
-
-  state.geocodeInFlight = true;
-  let changes = cachedHits;
+  els.submitUseLocationButton.disabled = true;
+  setSubmitLocationStatus("Getting your location...");
 
   try {
-    for (let index = 0; index < candidates.length; index += 1) {
-      const candidate = candidates[index];
-      const coordinates = await geocodeQuery(candidate.query);
-      if (!coordinates) continue;
+    const position = await getCurrentPosition({
+      enableHighAccuracy: true,
+      timeout: 7000,
+      maximumAge: 120000
+    });
 
-      for (const rowId of candidate.ids) {
-        state.rowCoordinates[rowId] = coordinates;
-      }
-      state.geocodeCache[candidate.query] = {
-        lat: coordinates.lat,
-        lng: coordinates.lng,
-        cachedAt: Date.now()
-      };
-      changes += 1;
+    const latitude = Number(position.coords.latitude);
+    const longitude = Number(position.coords.longitude);
 
-      if (index % 6 === 0) {
-        applyFilters();
-      }
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+      setSubmitLocationStatus("Could not read your location.");
+      return;
     }
+
+    els.submitLatitude.value = String(latitude);
+    els.submitLongitude.value = String(longitude);
+    setSubmitLocationStatus("Pinned.");
+  } catch {
+    setSubmitLocationStatus("Location blocked.");
   } finally {
-    state.geocodeInFlight = false;
-  }
-
-  if (changes) {
-    saveGeocodeCache();
-    applyFilters();
-  }
-
-  if (state.pendingGeocodeRows) {
-    const pendingRows = state.pendingGeocodeRows;
-    state.pendingGeocodeRows = null;
-    queueNearbyGeocoding(pendingRows);
+    els.submitUseLocationButton.disabled = false;
   }
 }
 
-function buildGeocodeQuery(row) {
-  const address = normalizeInput(row.address_text);
-  const postcode = normalizeInput(row.postcode);
-
-  if (!address && !postcode) {
-    return "";
-  }
-
-  const parts = [address, postcode, "Milton Keynes", "United Kingdom"].filter(Boolean);
-  return parts.join(", ");
-}
-
-function getCachedGeocode(query) {
-  const entry = state.geocodeCache[query];
-  if (!entry) return null;
-
-  if (!Number.isFinite(entry.lat) || !Number.isFinite(entry.lng)) {
-    return null;
-  }
-
-  if (!entry.cachedAt || Date.now() - entry.cachedAt > GEOCODE_CACHE_MAX_AGE_MS) {
-    delete state.geocodeCache[query];
-    return null;
-  }
-
-  return { lat: entry.lat, lng: entry.lng };
-}
-
-async function geocodeQuery(query) {
-  const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&countrycodes=gb&q=${encodeURIComponent(query)}`;
-
-  try {
-    const response = await fetchWithTimeout(
-      url,
-      {
-        headers: {
-          Accept: "application/json"
-        }
-      },
-      GEOCODE_TIMEOUT_MS
-    );
-
-    if (!response.ok) {
-      return null;
-    }
-
-    const data = await response.json();
-    const first = Array.isArray(data) ? data[0] : null;
-    const lat = Number(first?.lat);
-    const lng = Number(first?.lon);
-
-    if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
-      return null;
-    }
-
-    return { lat, lng };
-  } catch {
-    return null;
-  }
-}
-
-function fetchWithTimeout(url, options, timeoutMs) {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-
-  return fetch(url, { ...options, signal: controller.signal }).finally(() => {
-    clearTimeout(timeoutId);
-  });
-}
-
-function loadGeocodeCache() {
-  try {
-    const raw = window.localStorage.getItem(GEOCODE_CACHE_KEY);
-    if (!raw) return {};
-
-    const parsed = JSON.parse(raw);
-    if (!parsed || typeof parsed !== "object") return {};
-
-    const next = {};
-    for (const [query, value] of Object.entries(parsed)) {
-      const lat = Number(value?.lat);
-      const lng = Number(value?.lng);
-      const cachedAt = Number(value?.cachedAt || 0);
-
-      if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
-      if (!cachedAt || Date.now() - cachedAt > GEOCODE_CACHE_MAX_AGE_MS) continue;
-
-      next[query] = { lat, lng, cachedAt };
-    }
-    return next;
-  } catch {
-    return {};
-  }
-}
-
-function saveGeocodeCache() {
-  try {
-    window.localStorage.setItem(GEOCODE_CACHE_KEY, JSON.stringify(state.geocodeCache || {}));
-  } catch {
-    // Ignore cache errors.
+function setSubmitLocationStatus(message) {
+  if (els.submitLocationStatus) {
+    els.submitLocationStatus.textContent = message;
   }
 }
 
@@ -832,9 +753,9 @@ async function renderNearbyMap(rows) {
       zoomControl: true
     });
 
-    window.L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    window.L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
       maxZoom: 19,
-      attribution: "&copy; OpenStreetMap contributors"
+      attribution: "&copy; OpenStreetMap contributors &copy; CARTO"
     }).addTo(state.map);
 
     state.mapLayer = window.L.layerGroup().addTo(state.map);
@@ -861,7 +782,13 @@ async function renderNearbyMap(rows) {
     const coordinates = getRowCoordinates(row);
     if (!coordinates) continue;
 
-    const marker = window.L.marker([coordinates.lat, coordinates.lng]);
+    const marker = window.L.circleMarker([coordinates.lat, coordinates.lng], {
+      radius: 6,
+      weight: 2,
+      color: "#0f1215",
+      fillColor: "#ffffff",
+      fillOpacity: 1
+    });
     const title = escapeHtml(row.title || "Listing");
     const distance = Number.isFinite(row._distanceKm) ? ` (${escapeHtml(formatDistance(row._distanceKm))})` : "";
     marker.bindPopup(`<strong>${title}</strong>${distance}`);
@@ -893,19 +820,53 @@ function ensureLeaflet() {
 
   state.leafletPromise = new Promise((resolve, reject) => {
     ensureLeafletCss();
+    let settled = false;
+    const timeoutId = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      reject(new Error("Leaflet load timeout"));
+    }, 3000);
 
     const existing = document.querySelector(`script[src="${LEAFLET_JS_URL}"]`);
     if (existing) {
-      existing.addEventListener("load", () => resolve(window.L), { once: true });
-      existing.addEventListener("error", () => reject(new Error("Leaflet failed to load")), { once: true });
+      existing.addEventListener(
+        "load",
+        () => {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timeoutId);
+          resolve(window.L);
+        },
+        { once: true }
+      );
+      existing.addEventListener(
+        "error",
+        () => {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timeoutId);
+          reject(new Error("Leaflet failed to load"));
+        },
+        { once: true }
+      );
       return;
     }
 
     const script = document.createElement("script");
     script.src = LEAFLET_JS_URL;
     script.async = true;
-    script.onload = () => resolve(window.L);
-    script.onerror = () => reject(new Error("Leaflet failed to load"));
+    script.onload = () => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeoutId);
+      resolve(window.L);
+    };
+    script.onerror = () => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeoutId);
+      reject(new Error("Leaflet failed to load"));
+    };
     document.head.appendChild(script);
   });
 
@@ -988,15 +949,7 @@ function getRowCoordinates(row) {
   if (Number.isFinite(latitude) && Number.isFinite(longitude)) {
     return { lat: latitude, lng: longitude };
   }
-
-  const fromMemory = state.rowCoordinates[row.id];
-  if (!fromMemory) return null;
-
-  const cachedLat = Number(fromMemory.lat);
-  const cachedLng = Number(fromMemory.lng);
-  if (!Number.isFinite(cachedLat) || !Number.isFinite(cachedLng)) return null;
-
-  return { lat: cachedLat, lng: cachedLng };
+  return null;
 }
 
 function computeNearbyScore(row) {
@@ -1058,6 +1011,17 @@ function getErrorMessage(error) {
   if (!message) return "Unknown error";
   if (message.includes("Could not find the table")) return "Missing tables. Run supabase/schema.sql.";
   return message;
+}
+
+function isMissingColumnError(error, columnNames = []) {
+  const message = getErrorMessage(error).toLowerCase();
+  if (!message.includes("column")) return false;
+  return columnNames.some((columnName) => message.includes(String(columnName || "").toLowerCase()));
+}
+
+function isCategoryForeignKeyError(error) {
+  const message = getErrorMessage(error).toLowerCase();
+  return message.includes("foreign key") && message.includes("category_slug");
 }
 
 function isAuthLockError(error) {
@@ -1598,6 +1562,7 @@ function toggleSubmitPanel(open) {
     els.submitForm.querySelector("#submit-title")?.focus();
   } else {
     clearImagePreview();
+    setSubmitLocationStatus("");
     setSubmitFeedback("", "neutral");
   }
 }
@@ -1622,6 +1587,8 @@ async function handleSubmitListing(event) {
   const tagsRaw = normalizeInput(formData.get("tags"));
   const sourceUrl = normalizeInput(formData.get("source_url"));
   const submitterName = normalizeInput(formData.get("name"));
+  const latitudeRaw = normalizeInput(formData.get("latitude"));
+  const longitudeRaw = normalizeInput(formData.get("longitude"));
   const imageFile = els.submitImageFile.files?.[0] || null;
 
   if (!title || !categorySlug || !description) {
@@ -1637,6 +1604,19 @@ async function handleSubmitListing(event) {
       return;
     }
     startsAt = parsed.toISOString();
+  }
+
+  const latitude = latitudeRaw ? Number(latitudeRaw) : null;
+  const longitude = longitudeRaw ? Number(longitudeRaw) : null;
+
+  if ((latitudeRaw && !Number.isFinite(latitude)) || (longitudeRaw && !Number.isFinite(longitude))) {
+    setSubmitFeedback("Pinned location is invalid. Try pinning again.", "warn");
+    return;
+  }
+
+  if ((latitude !== null && (latitude < -90 || latitude > 90)) || (longitude !== null && (longitude < -180 || longitude > 180))) {
+    setSubmitFeedback("Pinned location is out of range.", "warn");
+    return;
   }
 
   if (imageFile) {
@@ -1674,6 +1654,8 @@ async function handleSubmitListing(event) {
     website_url: emptyToNull(websiteUrl),
     booking_url: emptyToNull(bookingUrl),
     address_text: emptyToNull(location),
+    latitude,
+    longitude,
     tags: parseTags(tagsRaw),
     status: "published",
     is_active_now: false,
@@ -1684,6 +1666,27 @@ async function handleSubmitListing(event) {
   };
 
   let { error } = await state.supabasePublic.from("search_documents").insert(payload);
+
+  if (error && isMissingColumnError(error, ["latitude", "longitude"])) {
+    const fallbackPayload = { ...payload };
+    delete fallbackPayload.latitude;
+    delete fallbackPayload.longitude;
+    const retryWithoutCoordinates = await state.supabasePublic.from("search_documents").insert(fallbackPayload);
+    error = retryWithoutCoordinates.error;
+  }
+
+  if (error && isCategoryForeignKeyError(error)) {
+    const fallbackPayload = {
+      ...payload,
+      category_slug: null,
+      tags: [...parseTags(tagsRaw), categorySlug].filter(Boolean).slice(0, 8)
+    };
+    const retryWithoutCategory = await state.supabasePublic.from("search_documents").insert(fallbackPayload);
+    error = retryWithoutCategory.error;
+    if (!error) {
+      setSubmitFeedback("Posted. Category will appear after category sync.", "ok");
+    }
+  }
 
   if (error && isAuthLockError(error)) {
     await wait(180);
@@ -1712,6 +1715,7 @@ async function handleSubmitListing(event) {
 
   els.submitForm.reset();
   clearImagePreview();
+  setSubmitLocationStatus("");
   setSubmitFeedback("Posted.", "ok");
 
   try {

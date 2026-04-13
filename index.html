@@ -5,10 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>MK Discover</title>
   <meta name="description" content="Discover what is happening, available, and worth knowing in Milton Keynes." />
+  <link rel="preconnect" href="https://unpkg.com" crossorigin />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="preload" as="script" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="styles.css?v=20260413p" />
+  <link rel="stylesheet" href="styles.css?v=20260413q" />
 </head>
 <body>
   <main class="app">
@@ -104,6 +107,13 @@
           <span>Location</span>
           <input id="submit-location" name="location" type="text" maxlength="180" placeholder="Area, venue, or postcode" />
         </label>
+        <div class="submit-field submit-location-tools">
+          <span>Pin</span>
+          <button id="submit-use-location-button" class="ghost-button" type="button">Use my location</button>
+          <small id="submit-location-status" class="submit-location-status"></small>
+          <input id="submit-latitude" name="latitude" type="hidden" />
+          <input id="submit-longitude" name="longitude" type="hidden" />
+        </div>
 
         <label class="submit-field" for="submit-image-file">
           <span>Image</span>
@@ -191,6 +201,6 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="config.js?v=20260413o"></script>
-  <script src="app.js?v=20260413p"></script>
+  <script src="app.js?v=20260413q"></script>
 </body>
 </html>
