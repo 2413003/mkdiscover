@@ -85,12 +85,16 @@ async function init() {
 
     if (categoriesResult.status === "rejected") {
       state.categories = [];
-      issues.push(`categories: ${getErrorMessage(categoriesResult.reason)}`);
+      if (!isAuthLockError(categoriesResult.reason)) {
+        issues.push(`categories: ${getErrorMessage(categoriesResult.reason)}`);
+      }
     }
 
     if (listingsResult.status === "rejected") {
       state.listings = [];
-      issues.push(`listings: ${getErrorMessage(listingsResult.reason)}`);
+      if (!isAuthLockError(listingsResult.reason)) {
+        issues.push(`listings: ${getErrorMessage(listingsResult.reason)}`);
+      }
     }
 
     ensureCategoriesAvailable();
