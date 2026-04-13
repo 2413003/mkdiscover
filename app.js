@@ -1,7 +1,7 @@
 const config = window.MK_DISCOVER_CONFIG || {};
 const CACHE_KEY = "mk_discover_cache_v1";
 const CACHE_MAX_AGE_MS = 1000 * 60 * 15;
-const INITIAL_LOAD_TIMEOUT_MS = 900;
+const INITIAL_LOAD_TIMEOUT_MS = 1500;
 const LISTING_IMAGE_BUCKET = "listing-images";
 const MAX_IMAGE_SIZE_BYTES = 5 * 1024 * 1024;
 const DEFAULT_CATEGORIES = [
@@ -103,19 +103,16 @@ async function init() {
       withTimeout(loadCategories(), INITIAL_LOAD_TIMEOUT_MS, "categories"),
       withTimeout(loadListings(), INITIAL_LOAD_TIMEOUT_MS, "listings")
     ]);
-    const issues = [];
+    let listingsIssue = null;
 
     if (categoriesResult.status === "rejected") {
       state.categories = [];
-      if (!isAuthLockError(categoriesResult.reason)) {
-        issues.push(`categories: ${getErrorMessage(categoriesResult.reason)}`);
-      }
     }
 
     if (listingsResult.status === "rejected") {
       state.listings = [];
       if (!isAuthLockError(listingsResult.reason)) {
-        issues.push(`listings: ${getErrorMessage(listingsResult.reason)}`);
+        listingsIssue = getErrorMessage(listingsResult.reason);
       }
     }
 
@@ -131,17 +128,17 @@ async function init() {
       }
     });
 
-    if (!issues.length) {
+    if (!listingsIssue) {
       setStatus("Live data connected.", "ok");
       saveCache();
     } else if (hasCache) {
       setStatus("Using saved results while live sync retries.", "warn");
     } else {
-      setStatus(`Supabase issue - ${issues[0]}`, "warn");
+      setStatus(`Supabase issue - listings: ${listingsIssue}`, "warn");
     }
 
     setupRealtime();
-    if (issues.length) {
+    if (listingsIssue) {
       startBackgroundSync();
     }
   } catch (error) {
@@ -326,19 +323,28 @@ function saveCache() {
 }
 
 function startBackgroundSync() {
-  Promise.all([loadCategories(), loadListings()])
-    .then(() => {
+  Promise.allSettled([loadCategories(), loadListings()]).then(([categoriesResult, listingsResult]) => {
+    if (categoriesResult.status === "rejected") {
+      state.categories = [];
+    }
+
+    if (listingsResult.status === "rejected") {
+      if (!isAuthLockError(listingsResult.reason)) {
+        console.error(listingsResult.reason);
+        setStatus(`Supabase issue - listings: ${getErrorMessage(listingsResult.reason)}`, "warn");
+      }
       ensureCategoriesAvailable();
       hydrateFilters();
       applyFilters();
-      saveCache();
-      setStatus("Live data connected.", "ok");
-    })
-    .catch((error) => {
-      if (!isAuthLockError(error)) {
-        console.error(error);
-      }
-    });
+      return;
+    }
+
+    ensureCategoriesAvailable();
+    hydrateFilters();
+    applyFilters();
+    saveCache();
+    setStatus("Live data connected.", "ok");
+  });
 }
 
 function applyFilters() {
