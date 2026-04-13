@@ -11,7 +11,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="styles.css?v=20260413ac" />
+  <link rel="stylesheet" href="styles.css?v=20260413ad" />
 </head>
 <body>
   <main class="app">
@@ -220,6 +220,21 @@
         <div id="nearby-map" class="nearby-map" aria-label="Nearby listings map"></div>
       </aside>
     </section>
+
+    <nav class="mobile-bottom-nav" aria-label="Primary">
+      <button class="mobile-bottom-nav__item is-active" type="button">
+        <span class="mobile-bottom-nav__icon" aria-hidden="true">&#128269;</span>
+        <span>Explore</span>
+      </button>
+      <button class="mobile-bottom-nav__item" type="button">
+        <span class="mobile-bottom-nav__icon" aria-hidden="true">&#9825;</span>
+        <span>Wishlists</span>
+      </button>
+      <button class="mobile-bottom-nav__item" type="button">
+        <span class="mobile-bottom-nav__icon" aria-hidden="true">&#9711;</span>
+        <span>Log in</span>
+      </button>
+    </nav>
   </main>
 
   <template id="result-card-template">
