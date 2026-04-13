@@ -1217,14 +1217,17 @@ h1 {
   }
 
   .results-grid {
-    display: grid;
-    grid-auto-flow: column;
-    grid-auto-columns: minmax(48vw, 1fr);
-    gap: 14px;
+    display: flex;
+    gap: 12px;
     overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
+    touch-action: pan-x;
     padding: 0 14px 12px;
-    margin: 0 -14px;
+    margin: 0;
     scroll-snap-type: x mandatory;
+    scroll-padding-inline: 14px;
   }
 
   .results-grid::-webkit-scrollbar {
@@ -1233,7 +1236,10 @@ h1 {
 
   .result-card {
     position: relative;
+    flex: 0 0 clamp(240px, 74vw, 320px);
+    max-width: clamp(240px, 74vw, 320px);
     scroll-snap-align: start;
+    scroll-snap-stop: always;
     gap: 6px;
     padding-bottom: 2px;
   }
@@ -1313,7 +1319,7 @@ h1 {
   }
 
   .results-grid .empty-state {
-    min-width: calc(100vw - 28px);
+    min-width: calc(100% - 28px);
   }
 
   .nearby-panel {
