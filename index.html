@@ -11,11 +11,11 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="styles.css?v=20260413ab" />
+  <link rel="stylesheet" href="styles.css?v=20260413ac" />
 </head>
 <body>
   <main class="app">
-    <header class="hero">
+    <header id="hero" class="hero">
       <div class="search-mode" role="tablist" aria-label="Search mode">
         <button id="mode-discover" class="mode-button is-active" type="button" role="tab" aria-selected="true">Discover</button>
         <button id="mode-plan" class="mode-button" type="button" role="tab" aria-selected="false">Plan</button>
@@ -209,7 +209,7 @@
 
     <section class="discovery-layout">
       <section class="discovery-list">
-        <section class="results-head">
+        <section id="results-head" class="results-head">
           <h2>Results</h2>
           <p id="results-summary">No results yet.</p>
         </section>
@@ -239,6 +239,6 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" defer></script>
   <script src="config.js?v=20260413o"></script>
-  <script src="app.js?v=20260413ab"></script>
+  <script src="app.js?v=20260413ac"></script>
 </body>
 </html>

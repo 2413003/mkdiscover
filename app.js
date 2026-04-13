@@ -70,6 +70,7 @@ const state = {
   planWhen: "any",
   planWho: "any",
   hasSearched: false,
+  scrollCondensed: false,
   filtersMenuOpen: false,
   submitting: false,
   isOperator: false,
@@ -88,6 +89,8 @@ const state = {
 const els = {
   modeDiscover: document.getElementById("mode-discover"),
   modePlan: document.getElementById("mode-plan"),
+  hero: document.getElementById("hero"),
+  resultsHead: document.getElementById("results-head"),
   refineRow: document.getElementById("refine-row"),
   filtersToggle: document.getElementById("filters-toggle"),
   filtersMenu: document.getElementById("filters-menu"),
@@ -139,6 +142,8 @@ init();
 async function init() {
   wireEvents();
   setSearchMode(state.mode);
+  setupHeroCondense();
+  syncHeroCondensed();
   syncRefineControls();
   setNearbyButtonState();
   const publicKey = config.SUPABASE_PUBLISHABLE_KEY || config.SUPABASE_ANON_KEY;
@@ -363,21 +368,25 @@ function setSearchMode(mode) {
 
 function setHasSearched(hasSearched) {
   state.hasSearched = Boolean(hasSearched);
-  if (!state.hasSearched) {
+  if (!state.hasSearched && !state.scrollCondensed) {
     state.filtersMenuOpen = false;
   }
+  syncHeroCondensed();
   syncRefineControls();
 }
 
 function setFiltersMenuOpen(isOpen) {
-  state.filtersMenuOpen = Boolean(isOpen) && state.hasSearched;
+  state.filtersMenuOpen = Boolean(isOpen) && isHeroCondensed();
   syncRefineControls();
 }
 
 function syncRefineControls() {
   if (!els.refineRow || !els.filtersToggle || !els.filtersMenu) return;
 
-  const isCondensed = state.hasSearched;
+  const isCondensed = isHeroCondensed();
+  if (!isCondensed) {
+    state.filtersMenuOpen = false;
+  }
   const isMenuOpen = isCondensed && state.filtersMenuOpen;
 
   els.refineRow.classList.toggle("is-condensed", isCondensed);
@@ -385,6 +394,50 @@ function syncRefineControls() {
   els.filtersToggle.hidden = !isCondensed;
   els.filtersToggle.setAttribute("aria-expanded", String(isMenuOpen));
   els.filtersMenu.hidden = isCondensed && !isMenuOpen;
+}
+
+function setupHeroCondense() {
+  let ticking = false;
+  const onViewportChange = () => {
+    if (ticking) return;
+    ticking = true;
+    window.requestAnimationFrame(() => {
+      ticking = false;
+      updateScrollCondensedState();
+    });
+  };
+
+  window.addEventListener("scroll", onViewportChange, { passive: true });
+  window.addEventListener("resize", onViewportChange);
+  updateScrollCondensedState();
+}
+
+function isHeroCondensed() {
+  return state.hasSearched || state.scrollCondensed;
+}
+
+function getHeroCondenseThreshold() {
+  if (!els.resultsHead) return 120;
+  const rect = els.resultsHead.getBoundingClientRect();
+  const top = rect.top + window.scrollY;
+  return Math.max(88, top - 140);
+}
+
+function updateScrollCondensedState() {
+  const shouldCondense = window.scrollY >= getHeroCondenseThreshold();
+  if (state.scrollCondensed === shouldCondense) return;
+
+  state.scrollCondensed = shouldCondense;
+  if (!isHeroCondensed()) {
+    state.filtersMenuOpen = false;
+  }
+  syncHeroCondensed();
+  syncRefineControls();
+}
+
+function syncHeroCondensed() {
+  const isCondensed = isHeroCondensed();
+  els.hero?.classList.toggle("is-condensed", isCondensed);
 }
 
 async function loadCategories() {

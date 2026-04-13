@@ -49,6 +49,50 @@ body {
   border-radius: var(--radius-xl);
   box-shadow: var(--shadow);
   padding: 28px 28px 24px;
+  position: relative;
+  transition: padding 180ms ease, border-radius 180ms ease, box-shadow 180ms ease, top 180ms ease;
+}
+
+.hero.is-condensed {
+  position: sticky;
+  top: 8px;
+  z-index: 120;
+  padding: 12px 14px;
+  border-radius: 20px;
+  box-shadow: 0 14px 30px rgba(7, 19, 36, 0.14);
+}
+
+.hero.is-condensed .search-mode {
+  display: none;
+}
+
+.hero.is-condensed .search-form,
+.hero.is-condensed .plan-form {
+  margin-top: 0;
+  gap: 8px;
+}
+
+.hero.is-condensed .search-form input,
+.hero.is-condensed .search-form button,
+.hero.is-condensed .plan-field,
+.hero.is-condensed .plan-form button {
+  min-height: 50px;
+  border-radius: 14px;
+}
+
+.hero.is-condensed .refine-row {
+  margin-top: 8px;
+  gap: 8px;
+}
+
+.hero.is-condensed .field,
+.hero.is-condensed .ghost-button {
+  min-height: 42px;
+  border-radius: 12px;
+}
+
+.hero.is-condensed .field-label {
+  font-size: 0.72rem;
 }
 
 h1 {
@@ -901,6 +945,20 @@ h1 {
   .hero {
     border-radius: 24px;
     padding: 18px 16px 16px;
+  }
+
+  .hero.is-condensed {
+    top: 6px;
+    padding: 10px;
+    border-radius: 16px;
+  }
+
+  .hero.is-condensed .search-form input,
+  .hero.is-condensed .search-form button,
+  .hero.is-condensed .plan-field,
+  .hero.is-condensed .plan-form button {
+    min-height: 48px;
+    border-radius: 13px;
   }
 
   .search-form {
