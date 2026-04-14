@@ -9,7 +9,14 @@
   const LAUNCHER_STORAGE_KEY = "mk_discover_launcher_v2";
   const LAUNCHER_MAX_FAVORITES = 8;
   const DEFAULT_LAUNCHER_FAVORITES = [
-    "Run",
+    "events",
+    "restaurants",
+    "cafes",
+    "pubs-and-bars",
+    "parks-and-outdoors",
+    "family-and-kids",
+    "shopping-and-retail",
+    "local-deals"
   ];
   const EXTERNAL_APPS = [
     {
@@ -20,19 +27,19 @@
       palette: { soft: "#f6f1e8", soft2: "#e4d7bf", ink: "#5f4320" }
     },
     {
-      id: "redway",
-      name: "Redway",
-      href: "https://runmk.com/",
-      logoUrl: "https://runmk.com/assets/images/image01.png?v=725d78a6",
-      palette: { soft: "#f6f1e8", soft2: "#e4d7bf", ink: "#5f4320" }
-    },
-    {
       id: "food",
       name: "Food",
       href: "https://mkfood.co.uk/",
       logoUrl:
         "https://mkfood.co.uk/cdn/shop/files/ChatGPT_Image_Nov_26_2025_10_55_01_AM.png?v=1770035659&width=500",
       palette: { soft: "#fff1ef", soft2: "#ffd7d2", ink: "#9f4335" }
+    },
+    {
+      id: "redway",
+      name: "Redway",
+      href: "https://runmk.com/",
+      logoUrl: "https://runmk.com/assets/images/image01.png?v=725d78a6",
+      palette: { soft: "#eef3ff", soft2: "#d3e0ff", ink: "#3356a8" }
     }
   ];
   const LAUNCHER_PALETTES = [
@@ -153,11 +160,37 @@
     els.filtersMenu.hidden = !isMenuOpen;
   }
 
+  function syncAppsLauncherChrome() {
+    const favoritesSection = launcherEls.favorites?.closest(".apps-launcher-menu__section");
+    const favoritesLabelRow = favoritesSection?.querySelector(".apps-launcher-menu__label-row");
+    const librarySection = launcherEls.library?.closest(".apps-launcher-menu__section");
+
+    if (launcherEls.edit) {
+      launcherEls.edit.hidden = true;
+      launcherEls.edit.setAttribute("aria-hidden", "true");
+      launcherEls.edit.classList.remove("is-active");
+      launcherEls.edit.setAttribute("aria-pressed", "false");
+    }
+
+    if (favoritesLabelRow) {
+      favoritesLabelRow.hidden = true;
+    }
+
+    if (launcherEls.favorites) {
+      launcherEls.favorites.setAttribute("aria-label", "MK apps");
+    }
+
+    if (librarySection) {
+      librarySection.hidden = true;
+    }
+  }
+
   function syncAppsLauncher() {
     if (!launcherEls.toggle || !launcherEls.menu) {
       return;
     }
 
+    state.appsMenuEditing = false;
     const isOpen = Boolean(state.appsMenuOpen && isDesktopLauncherAvailable());
     const hasActiveCategory = Boolean(els.category?.value);
 
@@ -165,12 +198,8 @@
     launcherEls.toggle.classList.toggle("is-selected", hasActiveCategory);
     launcherEls.toggle.setAttribute("aria-expanded", String(isOpen));
     launcherEls.menu.hidden = !isOpen;
-    launcherEls.menu.classList.toggle("is-editing", Boolean(state.appsMenuEditing));
-
-    if (launcherEls.edit) {
-      launcherEls.edit.classList.toggle("is-active", Boolean(state.appsMenuEditing));
-      launcherEls.edit.setAttribute("aria-pressed", String(Boolean(state.appsMenuEditing)));
-    }
+    launcherEls.menu.classList.remove("is-editing");
+    syncAppsLauncherChrome();
   }
 
   function setAppsMenuOpen(isOpen) {
@@ -395,7 +424,7 @@
     tile.style.textDecoration = "none";
 
     if (isExternal) {
-      tile.classList.add("sppos%-external");
+      tile.classList.add("apps-tile--external");
       tile.href = item.href;
       tile.target = "_blank";
       tile.rel = "noreferrer noopener";
@@ -459,37 +488,15 @@
       return;
     }
 
-    const categories = getLauncherCategories();
-    const favorites = readLauncherPreferences(categories);
-    const categoryMap = new Map(categories.map((category) => [category.slug, category]));
-    const favoriteSet = new Set(favorites);
     const favoriteFragment = document.createDocumentFragment();
-    const libraryFragment = document.createDocumentFragment();
 
     EXTERNAL_APPS.forEach((app) => {
       favoriteFragment.appendChild(createLauncherTile(app, { showPin: false }));
     });
 
-    favoriteFragment.appendChild(
-      createLauncherTile({ slug: "", name: "All" }, { isFavorite: false, showPin: false })
-    );
-
-    favorites.forEach((slug) => {
-      const category = categoryMap.get(slug);
-      if (!category) {
-        return;
-      }
-      favoriteFragment.appendChild(createLauncherTile(category, { isFavorite: true }));
-    });
-
-    categories
-      .filter((category) => !favoriteSet.has(category.slug))
-      .forEach((category) => {
-        libraryFragment.appendChild(createLauncherTile(category));
-      });
-
     launcherEls.favorites.replaceChildren(favoriteFragment);
-    launcherEls.library.replaceChildren(libraryFragment);
+    launcherEls.library.replaceChildren();
+    syncAppsLauncherChrome();
     syncLauncherSelection();
   }
 
