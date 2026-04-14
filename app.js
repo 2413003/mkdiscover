@@ -18,7 +18,7 @@ const LEAFLET_CSS_URL = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
 const LEAFLET_JS_URL = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
 const INTEGER_FORMATTER = new Intl.NumberFormat("en-GB");
 const DEFAULT_CATEGORIES = [
-  { slug: "events", name: "Events" }
+  { slug: "park", name: "Park" }
 ];
 
 const state = {
