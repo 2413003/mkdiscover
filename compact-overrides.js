@@ -245,31 +245,21 @@
   if (typeof MutationObserver === "function") {
     const placeholderObserver = new MutationObserver((mutations) => {
       for (const mutation of mutations) {
-        if (mutation.type === "childList" && mutation.addedNodes.length) {
-          mutation.addedNodes.forEach((node) => {
-            if (node instanceof Element) {
-              syncPlaceholderFonts(node);
-            }
-          });
+        if (mutation.type !== "childList" || !mutation.addedNodes.length) {
           continue;
         }
 
-        if (
-          mutation.type === "attributes" &&
-          mutation.target instanceof HTMLImageElement &&
-          mutation.target.classList.contains("is-placeholder")
-        ) {
-          mutation.target.dataset.soraPlaceholder = "false";
-          syncPlaceholderFonts(mutation.target.parentElement || document);
-        }
+        mutation.addedNodes.forEach((node) => {
+          if (node instanceof Element) {
+            syncPlaceholderFonts(node);
+          }
+        });
       }
     });
 
     placeholderObserver.observe(document.body, {
       childList: true,
-      subtree: true,
-      attributes: true,
-      attributeFilter: ["class", "src"]
+      subtree: true
     });
   }
 
