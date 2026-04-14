@@ -18,42 +18,7 @@ const LEAFLET_CSS_URL = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
 const LEAFLET_JS_URL = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
 const INTEGER_FORMATTER = new Intl.NumberFormat("en-GB");
 const DEFAULT_CATEGORIES = [
-  { slug: "events", name: "Events" },
-  { slug: "restaurants", name: "Restaurants" },
-  { slug: "cafes", name: "Cafes" },
-  { slug: "pubs-and-bars", name: "Pubs & Bars" },
-  { slug: "takeaways-and-delivery", name: "Takeaways & Delivery" },
-  { slug: "clubs-and-communities", name: "Clubs & Communities" },
-  { slug: "social-groups", name: "Social Groups" },
-  { slug: "social-media-and-creators", name: "Social Media & Creators" },
-  { slug: "gyms-and-fitness", name: "Gyms & Fitness" },
-  { slug: "sports-clubs", name: "Sports Clubs" },
-  { slug: "schools-and-colleges", name: "Schools & Colleges" },
-  { slug: "nurseries-and-childcare", name: "Nurseries & Childcare" },
-  { slug: "tutors-and-tuition", name: "Tutors & Tuition" },
-  { slug: "family-and-kids", name: "Family & Kids" },
-  { slug: "classes-and-courses", name: "Classes & Courses" },
-  { slug: "arts-and-culture", name: "Arts & Culture" },
-  { slug: "music-and-nightlife", name: "Music & Nightlife" },
-  { slug: "shopping-and-retail", name: "Shopping & Retail" },
-  { slug: "beauty-and-wellbeing", name: "Beauty & Wellbeing" },
-  { slug: "healthcare", name: "Healthcare" },
-  { slug: "dentists-opticians-pharmacy", name: "Dentists, Opticians & Pharmacy" },
-  { slug: "mental-health-support", name: "Mental Health Support" },
-  { slug: "parks-and-outdoors", name: "Parks & Outdoors" },
-  { slug: "venues-and-spaces", name: "Venues & Spaces" },
-  { slug: "coworking-and-study-spaces", name: "Coworking & Study Spaces" },
-  { slug: "jobs-and-careers", name: "Jobs & Careers" },
-  { slug: "charities-and-volunteering", name: "Charities & Volunteering" },
-  { slug: "faith-and-community", name: "Faith & Community" },
-  { slug: "automotive", name: "Automotive" },
-  { slug: "transport-and-travel", name: "Transport & Travel" },
-  { slug: "home-services", name: "Home Services" },
-  { slug: "trades-and-repairs", name: "Trades & Repairs" },
-  { slug: "property-and-rentals", name: "Property & Rentals" },
-  { slug: "business-services", name: "Business Services" },
-  { slug: "pets-and-vets", name: "Pets & Vets" },
-  { slug: "local-deals", name: "Local Deals" }
+  { slug: "events", name: "Events" }
 ];
 
 const state = {
