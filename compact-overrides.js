@@ -42,9 +42,44 @@
   const desktopMedia =
     typeof window.matchMedia === "function" ? window.matchMedia("(min-width: 761px)") : null;
 
+  repairPublishedMarkup();
+
   state.appsMenuOpen = false;
   state.appsMenuEditing = false;
   state.appsLauncherFavorites = [];
+
+  function repairPublishedMarkup() {
+    const brokenModeDiscover = document.querySelector("buttn#mode-discover");
+
+    if (brokenModeDiscover) {
+      const replacement = document.createElement("button");
+
+      [...brokenModeDiscover.attributes].forEach((attribute) => {
+        replacement.setAttribute(attribute.name, attribute.value);
+      });
+
+      replacement.innerHTML = brokenModeDiscover.innerHTML;
+      brokenModeDiscover.replaceWith(replacement);
+      els.modeDiscover = replacement;
+    }
+
+    if (!els.filtersMenu || !els.planForm) {
+      return;
+    }
+
+    [
+      els.category?.closest(".field"),
+      els.sort?.closest(".field"),
+      els.openNow?.closest(".field"),
+      els.filtersMenu.querySelector(".filters-menu__actions")
+    ]
+      .filter((node, index, nodes) => node instanceof Element && nodes.indexOf(node) === index)
+      .forEach((node) => {
+        if (els.planForm.contains(node)) {
+          els.filtersMenu.appendChild(node);
+        }
+      });
+  }
 
   function syncPlaceholderFonts(root = document) {
     const images = [];
