@@ -23,7 +23,7 @@
       id: "chess",
       name: "Chess",
       href: "https://mkchess.co.uk/",
-      logoUrl: "https://mkchess.co.uk/assets/images/apple-touch-icon.png?v=27456ca4",
+      logoUrl: "https://cdn.shopify.com/s/files/1/1017/6456/3275/files/Untitled_design_8.png?v=1776191651",
       palette: { soft: "#f6f1e8", soft2: "#e4d7bf", ink: "#5f4320" }
     },
     {
