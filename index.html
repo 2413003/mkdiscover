@@ -14,8 +14,19 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="styles.css?v=20260413-searchrail" />
+  <link rel="stylesheet" href="styles.css?v=20260414-sora-lock" />
   <style>
+    html,
+    body,
+    body * {
+      font-family: "Sora", "Segoe UI", sans-serif;
+    }
+
+    .nearby-map .leaflet-container,
+    .nearby-map .leaflet-container * {
+      font-family: "Sora", "Segoe UI", sans-serif !important;
+    }
+
     .compat-nodes,
     .status-line {
       display: none !important;
@@ -550,6 +561,6 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" defer></script>
   <script src="config.js?v=20260413o"></script>
   <script src="app.js?v=20260413-searchrail" defer></script>
-  <script src="compact-overrides.js?v=20260414-compact" defer></script>
+  <script src="compact-overrides.js?v=20260414-sora-lock" defer></script>
 </body>
 </html>

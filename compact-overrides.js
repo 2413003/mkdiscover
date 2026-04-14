@@ -3,8 +3,36 @@
     return;
   }
 
+  const SORA_CARD_PLACEHOLDER_IMAGE = `data:image/svg+xml,${encodeURIComponent(
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#edf1f4"/><stop offset="100%" stop-color="#dfe6eb"/></linearGradient></defs><rect width="1000" height="1000" fill="url(#g)"/><circle cx="300" cy="320" r="120" fill="#c8d2db"/><path d="M120 760l220-220 140 140 120-120 280 280H120z" fill="#bac6d0"/><text x="500" y="885" text-anchor="middle" fill="#6a7785" font-family="Sora,Segoe UI,sans-serif" font-size="64" font-weight="700">MK</text></svg>'
+  )}`;
   const sheetBackdrop = els.sheetBackdrop || document.getElementById("sheet-backdrop");
   const closeOperatorButton = els.closeOperatorPanel || document.getElementById("close-operator-panel");
+
+  function syncPlaceholderFonts(root = document) {
+    const images = [];
+
+    if (root instanceof HTMLImageElement && root.classList.contains("is-placeholder")) {
+      images.push(root);
+    }
+
+    root.querySelectorAll?.(".result-card__image.is-placeholder").forEach((image) => {
+      images.push(image);
+    });
+
+    images.forEach((image) => {
+      if (!(image instanceof HTMLImageElement)) {
+        return;
+      }
+
+      if (image.dataset.soraPlaceholder === "true") {
+        return;
+      }
+
+      image.src = SORA_CARD_PLACEHOLDER_IMAGE;
+      image.dataset.soraPlaceholder = "true";
+    });
+  }
 
   function syncSheets() {
     const hasSubmitPanel = Boolean(els.submitPanel);
@@ -214,7 +242,39 @@
     true
   );
 
+  if (typeof MutationObserver === "function") {
+    const placeholderObserver = new MutationObserver((mutations) => {
+      for (const mutation of mutations) {
+        if (mutation.type === "childList" && mutation.addedNodes.length) {
+          mutation.addedNodes.forEach((node) => {
+            if (node instanceof Element) {
+              syncPlaceholderFonts(node);
+            }
+          });
+          continue;
+        }
+
+        if (
+          mutation.type === "attributes" &&
+          mutation.target instanceof HTMLImageElement &&
+          mutation.target.classList.contains("is-placeholder")
+        ) {
+          mutation.target.dataset.soraPlaceholder = "false";
+          syncPlaceholderFonts(mutation.target.parentElement || document);
+        }
+      }
+    });
+
+    placeholderObserver.observe(document.body, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ["class", "src"]
+    });
+  }
+
   setCompactSearchMode(state.mode);
   setCompactFiltersMenuOpen(false);
   syncSheets();
+  syncPlaceholderFonts();
 })();
