@@ -40,6 +40,13 @@
       href: "https://runmk.com/",
       logoUrl: "https://runmk.com/assets/images/image04.png?v=86cef636",
       palette: { soft: "#eef3ff", soft2: "#d3e0ff", ink: "#3356a8" }
+    },
+    {
+      id: "park",
+      name: "Park",
+      href: "https://runmk.com/",
+      logoUrl: "https://cdn.shopify.com/s/files/1/1017/6456/3275/files/parking4.png?v=1776192750",
+      palette: { soft: "#eef3ff", soft2: "#d3e0ff", ink: "#3356a8" }
     }
   ];
   const LAUNCHER_PALETTES = [
