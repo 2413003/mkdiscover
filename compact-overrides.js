@@ -9,14 +9,7 @@
   const LAUNCHER_STORAGE_KEY = "mk_discover_launcher_v2";
   const LAUNCHER_MAX_FAVORITES = 8;
   const DEFAULT_LAUNCHER_FAVORITES = [
-    "events",
-    "restaurants",
-    "cafes",
-    "pubs-and-bars",
-    "parks-and-outdoors",
-    "family-and-kids",
-    "shopping-and-retail",
-    "local-deals"
+    "Run",
   ];
   const EXTERNAL_APPS = [
     {
