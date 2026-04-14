@@ -38,7 +38,7 @@
       id: "redway",
       name: "Redway",
       href: "https://runmk.com/",
-      logoUrl: "https://runmk.com/assets/images/image01.png?v=725d78a6",
+      logoUrl: "https://runmk.com/assets/images/image04.png?v=86cef636",
       palette: { soft: "#eef3ff", soft2: "#d3e0ff", ink: "#3356a8" }
     }
   ];
