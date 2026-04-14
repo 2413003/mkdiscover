@@ -18,6 +18,23 @@
     "shopping-and-retail",
     "local-deals"
   ];
+  const EXTERNAL_APPS = [
+    {
+      id: "chess",
+      name: "Chess",
+      href: "https://mkchess.co.uk/",
+      logoUrl: "https://mkchess.co.uk/assets/images/apple-touch-icon.png?v=27456ca4",
+      palette: { soft: "#f6f1e8", soft2: "#e4d7bf", ink: "#5f4320" }
+    },
+    {
+      id: "food",
+      name: "Food",
+      href: "https://mkfood.co.uk/",
+      logoUrl:
+        "https://mkfood.co.uk/cdn/shop/files/ChatGPT_Image_Nov_26_2025_10_55_01_AM.png?v=1770035659&width=500",
+      palette: { soft: "#fff1ef", soft2: "#ffd7d2", ink: "#9f4335" }
+    }
+  ];
   const LAUNCHER_PALETTES = [
     { soft: "#edf3ff", soft2: "#d6e5ff", ink: "#2754a6" },
     { soft: "#fff2e8", soft2: "#ffd6be", ink: "#aa4c0f" },
@@ -361,19 +378,30 @@
   }
 
   function createLauncherTile(item, { isFavorite = false, showPin = Boolean(item.slug) } = {}) {
-    const tile = document.createElement("button");
-    const palette = getPalette(item.slug || item.name || "mk");
+    const isExternal = Boolean(item.href);
+    const tile = document.createElement(isExternal ? "a" : "button");
+    const palette = item.palette || getPalette(item.slug || item.name || item.id || "mk");
     const pin = document.createElement("span");
     const icon = document.createElement("span");
     const label = document.createElement("span");
 
-    tile.type = "button";
     tile.className = "apps-tile";
-    tile.dataset.slug = item.slug || "";
+    tile.dataset.slug = typeof item.slug === "string" ? item.slug : item.id ? `external:${item.id}` : "";
     tile.dataset.favorite = String(isFavorite);
     tile.style.setProperty("--app-soft", palette.soft);
     tile.style.setProperty("--app-soft-2", palette.soft2);
     tile.style.setProperty("--app-ink", palette.ink);
+    tile.setAttribute("aria-label", item.href ? `Open ${item.name}` : item.name);
+    tile.style.textDecoration = "none";
+
+    if (isExternal) {
+      tile.classList.add("sppos%-external");
+      tile.href = item.href;
+      tile.target = "_blank";
+      tile.rel = "noreferrer noopener";
+    } else {
+      tile.type = "button";
+    }
 
     if (isFavorite) {
       tile.classList.add("is-favorite");
@@ -383,7 +411,29 @@
     pin.textContent = showPin ? (isFavorite ? "\u2212" : "+") : "";
 
     icon.className = "apps-tile__icon";
-    icon.textContent = getLauncherGlyph(item.name, item.slug);
+    if (item.logoUrl) {
+      const logo = document.createElement("img");
+      logo.className = "apps-tile__logo";
+      logo.src = item.logoUrl;
+      logo.alt = "";
+      logo.loading = "lazy";
+      logo.decoding = "async";
+      logo.style.width = "100%";
+      logo.style.height = "100%";
+      logo.style.display = "block";
+      logo.style.objectFit = "contain";
+
+      if (isExternal) {
+        icon.style.padding = "8px";
+        icon.style.overflow = "hidden";
+        icon.style.background = "rgba(255, 255, 255, 0.98)";
+        icon.style.boxShadow =
+          "inset 0 0 0 1px rgba(214, 221, 234, 0.9), 0 8px 20px rgba(83, 103, 139, 0.12)";
+      }
+      icon.appendChild(logo);
+    } else {
+      icon.textContent = getLauncherGlyph(item.name, item.slug);
+    }
 
     label.className = "apps-tile__label";
     label.textContent = item.name;
@@ -392,6 +442,10 @@
     tile.addEventListener("click", () => {
       if (state.appsMenuEditing && item.slug) {
         toggleLauncherFavorite(item.slug);
+        return;
+      }
+      if (item.href) {
+        setAppsMenuOpen(false);
         return;
       }
       selectLauncherCategory(item.slug);
@@ -411,6 +465,10 @@
     const favoriteSet = new Set(favorites);
     const favoriteFragment = document.createDocumentFragment();
     const libraryFragment = document.createDocumentFragment();
+
+    EXTERNAL_APPS.forEach((app) => {
+      favoriteFragment.appendChild(createLauncherTile(app, { showPin: false }));
+    });
 
     favoriteFragment.appendChild(
       createLauncherTile({ slug: "", name: "All" }, { isFavorite: false, showPin: false })
