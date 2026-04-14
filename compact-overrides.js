@@ -20,6 +20,13 @@
       palette: { soft: "#f6f1e8", soft2: "#e4d7bf", ink: "#5f4320" }
     },
     {
+      id: "redway",
+      name: "Redway",
+      href: "https://runmk.com/",
+      logoUrl: "https://runmk.com/assets/images/image01.png?v=725d78a6",
+      palette: { soft: "#f6f1e8", soft2: "#e4d7bf", ink: "#5f4320" }
+    },
+    {
       id: "food",
       name: "Food",
       href: "https://mkfood.co.uk/",
