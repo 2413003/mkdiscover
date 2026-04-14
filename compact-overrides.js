@@ -54,6 +54,13 @@
       href: "https://runmk.com/",
       logoUrl: "https://cdn.shopify.com/s/files/1/1017/6456/3275/files/safety5.png?v=1776193239",
       palette: { soft: "#eef3ff", soft2: "#d3e0ff", ink: "#3356a8" }
+    },
+    {
+      id: "sleep",
+      name: "Sleep",
+      href: "https://mksleep.carrd.co/",
+      logoUrl: "https://mksleep.carrd.co/assets/images/logo1.png?v=943d3eb2",
+      palette: { soft: "#eef3ff", soft2: "#d3e0ff", ink: "#3356a8" }
     }
   ];
   const LAUNCHER_PALETTES = [
