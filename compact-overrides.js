@@ -45,7 +45,7 @@
       id: "park",
       name: "Park",
       href: "https://runmk.com/",
-      logoUrl: "https://cdn.shopify.com/s/files/1/1017/6456/3275/files/parking4.png?v=1776192750",
+      logoUrl: "https://cdn.shopify.com/s/files/1/1017/6456/3275/files/parking10.png?v=1776251596",
       palette: { soft: "#eef3ff", soft2: "#d3e0ff", ink: "#3356a8" }
     },
     {
