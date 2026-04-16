@@ -75,6 +75,13 @@
       href: "https://mksleep.carrd.co/",
       logoUrl: "https://cdn.shopify.com/s/files/1/1017/6456/3275/files/Minimalist_finance_logo_design.png?v=1776193883",
       palette: { soft: "#eef3ff", soft2: "#d3e0ff", ink: "#3356a8" }
+    },
+    {
+      id: "ads",
+      name: "Ads",
+      href: "https://mksleep.carrd.co/",
+      logoUrl: "https://cdn.shopify.com/s/files/1/1017/6456/3275/files/ads_logo_google.png?v=1776351553",
+      palette: { soft: "#eef3ff", soft2: "#d3e0ff", ink: "#3356a8" }
     }
   ];
   const LAUNCHER_PALETTES = [
