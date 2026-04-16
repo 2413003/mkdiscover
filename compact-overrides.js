@@ -65,8 +65,15 @@
     {
       id: "find",
       name: "Find",
-      href: "https://mksleep.carrd.co/",
+      href: "https://2413003.github.io/mkfind2/",
       logoUrl: "https://cdn.shopify.com/s/files/1/1017/6456/3275/files/find_app_logo_v2.svg?v=1776195834",
+      palette: { soft: "#eef3ff", soft2: "#d3e0ff", ink: "#3356a8" }
+    },
+    {
+      id: "finance",
+      name: "Finance",
+      href: "https://mksleep.carrd.co/",
+      logoUrl: "https://cdn.shopify.com/s/files/1/1017/6456/3275/files/Minimalist_finance_logo_design.png?v=1776193883",
       palette: { soft: "#eef3ff", soft2: "#d3e0ff", ink: "#3356a8" }
     }
   ];
